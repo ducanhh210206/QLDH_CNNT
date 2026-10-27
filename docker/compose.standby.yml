@@ -1,0 +1,14 @@
+# TEMPLATE ONLY: explicit opt-in, separate machine/volume; no automatic promotion.
+name: omdrs-standby-lab
+services:
+  mysql-standby:
+    image: mysql:8.4.13
+    profiles: [standby-lab]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${STANDBY_ROOT_PASSWORD:?Set a dedicated standby root password}
+    ports: ["127.0.0.1:3307:3306"]
+    volumes:
+      - standby_lab_data:/var/lib/mysql
+      - ./mysql/my.cnf:/etc/mysql/conf.d/standby.cnf:ro
+volumes:
+  standby_lab_data:

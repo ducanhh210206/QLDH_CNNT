@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/.env
+.env
+**/dist
+database/backups/*
+monitoring/data
+*.zip
+.git
+
+# Local credentials, including recovery files, must never enter build context.
+**/.env.*
+!**/.env.example

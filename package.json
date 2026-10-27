@@ -1,0 +1,20 @@
+{
+  "name": "omdrs",
+  "private": true,
+  "version": "1.0.0",
+  "workspaces": [
+    "frontend",
+    "backend",
+    "monitoring"
+  ],
+  "scripts": {
+    "dev": "concurrently -k \"npm run dev -w backend\" \"npm run dev -w frontend\" \"npm start -w monitoring\"",
+    "build": "npm run build -w frontend",
+    "test": "npm test -w backend",
+    "db:init": "npm run db:init -w backend",
+    "user:create": "npm run user:create -w backend"
+  },
+  "devDependencies": {
+    "concurrently": "9.2.5"
+  }
+}

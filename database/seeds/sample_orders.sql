@@ -1,0 +1,3 @@
+-- Không tự seed dữ liệu vào database thật.
+-- Integration test tự tạo dữ liệu đánh dấu Test trong database omdrs_test_<uuid> cách ly.
+-- Tạo đơn thực tế qua giao diện sau khi đăng nhập.

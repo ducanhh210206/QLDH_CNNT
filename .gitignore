@@ -1,0 +1,18 @@
+node_modules/
+**/dist/
+.env
+**/.env
+*.log
+*.zip
+**/backups/*
+!**/backups/.gitkeep
+monitoring/data/
+
+**/.env.*
+!**/.env.example
+
+# Local machine artifacts and private operational recovery notes
+.DS_Store
+__pycache__/
+*.pyc
+docs/mysql-recovery.md

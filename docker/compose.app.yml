@@ -1,0 +1,58 @@
+name: omdrs
+x-api: &api
+  build:
+    context: ..
+    dockerfile: backend/Dockerfile
+  env_file: ${OMDRS_ENV_FILE:-../.env}
+  environment: &env
+    HOST: 0.0.0.0
+    NODE_ENV: production
+    DB_HOST: ${DB_HOST:-host.docker.internal}
+    MONITOR_URL: http://monitoring:5001
+  volumes:
+    - app_backups:/app/database/backups
+  restart: unless-stopped
+services:
+  backend-primary:
+    <<: *api
+    environment:
+      <<: *env
+      INSTANCE_NAME: primary
+  backend-standby:
+    <<: *api
+    environment:
+      <<: *env
+      INSTANCE_NAME: standby
+      BACKUP_INTERVAL_HOURS: "0"
+  monitoring:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    command: [node, /app/monitoring/src/server.js]
+    environment:
+      MONITOR_HOST: 0.0.0.0
+      MONITOR_TOKEN: ${MONITOR_TOKEN:?Set MONITOR_TOKEN}
+      PRIMARY_URL: http://backend-primary:5000
+      STANDBY_URL: http://backend-standby:5000
+      GATEWAY_URL: http://gateway
+    volumes:
+      - monitor_logs:/app/monitoring/data
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:5001/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+    restart: unless-stopped
+  gateway:
+    build:
+      context: ..
+      dockerfile: frontend/Dockerfile
+    ports: ["127.0.0.1:8080:80"]
+    depends_on: [backend-primary, backend-standby]
+    restart: unless-stopped
+volumes:
+  app_backups:
+  monitor_logs:

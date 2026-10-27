@@ -1,0 +1,27 @@
+{
+  "name": "@omdrs/backend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test tests/*.test.js",
+    "db:init": "node ../scripts/init-db.js",
+    "user:create": "node ../scripts/create-user.js"
+  },
+  "dependencies": {
+    "express": "5.1.0",
+    "mysql2": "3.24.6",
+    "dotenv": "17.2.3",
+    "helmet": "8.1.0",
+    "cors": "2.8.5",
+    "express-rate-limit": "8.7.1",
+    "jsonwebtoken": "9.0.2",
+    "cookie-parser": "1.4.7",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "supertest": "7.1.4"
+  }
+}
