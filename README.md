@@ -6,6 +6,15 @@ Chức năng chính: đăng nhập Admin/Staff, tạo và tìm kiếm đơn hàn
 
 > Hướng dẫn này dành cho người tải mã nguồn về máy mới. Repository không chứa tài khoản, mật khẩu, database hay dữ liệu trên máy tác giả. Người chạy phải tự cấu hình môi trường và tạo tài khoản website.
 
+## Chọn cách chạy trước khi cài
+
+| Cách chạy | MySQL | Backend | Frontend | Nơi xem BE |
+|---|---|---|---|---|
+| A — Node trực tiếp | Docker hoặc MySQL có sẵn | npm, mặc định cổng 5000 | Vite cổng 5173 | http://127.0.0.1:5000/health/ready |
+| B — Backend Docker | MySQL có sẵn, có thể là container riêng | Compose, cổng máy 5002 → cổng container 5000 | Vite cổng 5173 | http://127.0.0.1:5002/health/ready |
+
+Lần đầu làm chung bước **1–6** để chuẩn bị MySQL, cấu hình và tài khoản. Sau đó chọn **bước 7** cho cách A hoặc **bước 14** cho cách B. Chưa cần chạy Gateway, Standby hoặc toàn bộ Compose nâng cao để sử dụng đơn hàng.
+
 ## 1. Chuẩn bị
 
 | Thành phần | Yêu cầu |
@@ -26,7 +35,9 @@ git --version
 docker version
 ```
 
-`docker version` phải hiển thị được phần Server. Nếu báo không kết nối được daemon, mở Docker Desktop và chờ Engine sẵn sàng.
+Tải Node.js từ [trang Node.js chính thức](https://nodejs.org/en/download), Git từ [git-scm.com](https://git-scm.com/downloads) và Docker Desktop từ [hướng dẫn cài đặt Docker](https://docs.docker.com/desktop/setup/install/). Docker chỉ bắt buộc khi bạn chọn chạy MySQL hoặc BE trong container. Nếu dùng MySQL đã có trên server và chạy BE bằng Node, có thể bỏ qua kiểm tra Docker.
+
+Khi dùng Docker, `docker version` phải hiển thị được phần Server. Nếu báo không kết nối được daemon, mở Docker Desktop và chờ Engine sẵn sàng.
 
 ## 2. Tải mã nguồn và cài thư viện
 
@@ -37,11 +48,7 @@ git clone https://github.com/ducanhh210206/QLDH_CNNT.git omdrs
 cd omdrs
 ```
 
-Nếu repository có thêm thư mục con `order-management-system`, đi vào thư mục đó:
-
-```bash
-cd order-management-system
-```
+Repository hiện đặt `package.json` ngay ở thư mục gốc; **không chạy thêm `cd order-management-system` sau khi clone theo lệnh trên**. Tên thư mục `omdrs` do lệnh clone đặt, không cần giống tên thư mục trên máy tác giả.
 
 **Thư mục gốc dự án** trong toàn bộ hướng dẫn là thư mục chứa `package.json`, `package-lock.json`, `frontend/`, `backend/` và `monitoring/`. Kiểm tra bằng `ls` trên macOS/Linux hoặc `Get-ChildItem` trên PowerShell.
 
@@ -107,7 +114,7 @@ MYSQL_USER=order_user
 MYSQL_PASSWORD=THAY_BANG_MAT_KHAU_UNG_DUNG_RIENG
 ```
 
-Không dùng các chuỗi mẫu làm mật khẩu. Tệp này đã được loại khỏi Git bằng `.gitignore`.
+Không dùng các chuỗi mẫu làm mật khẩu. Có thể sinh từng mật khẩu bằng `node -e "console.log(require('crypto').randomBytes(24).toString('hex'))"` để tránh ký tự đặc biệt gây nhầm giữa Docker env-file và dotenv. Trong `.env.mysql.local` dùng giá trị trực tiếp, không thêm dấu nháy bao quanh; Docker `run --env-file` không đọc giống hệt dotenv. Tệp này đã được loại khỏi Git bằng `.gitignore`.
 
 Chạy lệnh sau trên một dòng; dùng được trong zsh, Bash và PowerShell:
 
@@ -178,7 +185,20 @@ Dán kết quả vào JWT_SECRET, không giữ chuỗi mẫu. Secret này khác 
 
 **Sau mỗi lần sửa `backend/.env`, dừng BE bằng Control + C rồi chạy lại để nạp cấu hình mới.** Không chỉ tải lại trang web.
 
-Frontend mặc định không cần tệp `.env`: Vite đã proxy `/api` và `/health` tới Backend cổng 5000.
+### Chọn cổng Backend mà FE gọi tới
+
+Trên bản clone mới, FE mặc định proxy `/api` và `/health` tới BE Node ở cổng **5000**. Bạn có thể tạo `frontend/.env` từ `frontend/.env.example` hoặc tự tạo bằng trình soạn thảo:
+
+```dotenv
+VITE_API_BASE=
+API_PROXY_TARGET=http://127.0.0.1:5000
+```
+
+- BE chạy bằng Node: dùng cổng 5000, hoặc cổng thực tế đã đặt trong backend/.env.
+- BE Docker theo bước 14: đổi API_PROXY_TARGET thành **http://127.0.0.1:5002**.
+- Giữ VITE_API_BASE rỗng khi dùng Vite proxy. API_PROXY_TARGET là cấu hình của máy chủ Vite, không phải secret và không phải URL API được nhúng vào bản build.
+
+Khởi động lại FE sau khi sửa tệp này. Tệp .env đã tồn tại từ lần chạy trước có thể vẫn trỏ tới BE Docker; phải chọn lại đúng chế độ đang dùng.
 
 ## 5. Khởi tạo database — chỉ thực hiện lần đầu
 
@@ -255,7 +275,7 @@ Khi nhập mật khẩu ẩn, Terminal không hiện ký tự. Nhập xong nhấ
 
 Chỉ tạo một lần. Nếu báo `ER_DUP_ENTRY` / `Duplicate entry` cho username admin, tài khoản đã tồn tại; dùng tài khoản đó để đăng nhập, không khởi tạo lại database. Muốn tạo nhân viên, đổi username và NEW_ROLE thành Staff.
 
-## 7. Chạy BE và FE
+## 7. Cách A — Chạy BE bằng Node và FE bằng Vite
 
 Mở **hai Terminal**, cả hai đều ở **thư mục gốc dự án**. Phần `-w backend` / `-w frontend` đã chọn package, không cần `cd` vào thư mục con.
 
@@ -336,17 +356,19 @@ npm start -w monitoring
 
 Đăng nhập Admin và mở **Giám sát hệ thống**. Thành phần chưa cấu hình hiển thị Not Configured. Monitor lưu chuyển trạng thái trong `monitoring/data/`, chạy độc lập với BE.
 
-Sau khi đã cấu hình xong, có thể dùng **một Terminal** để chạy cả BE, FE và Monitoring:
+Nếu chọn **cách A (BE Node)** và đã cấu hình xong, có thể dùng **một Terminal** để chạy cả BE, FE và Monitoring:
 
 ```bash
 npm run dev
 ```
 
-Dừng các tiến trình đang chạy riêng trước khi dùng lệnh tổng hợp, tránh trùng cổng. Control + C sẽ dừng cả ba tiến trình.
+Dừng các tiến trình đang chạy riêng trước khi dùng lệnh tổng hợp, tránh trùng cổng. Control + C sẽ dừng cả ba tiến trình. Lệnh này luôn tạo thêm BE Node; **không dùng thay cho bước khởi động BE Docker ở cách B**.
 
 ## 10. Backup, restore và mô phỏng
 
-- Admin tạo backup SQL trên trang **Backup & Restore**. Backup thật nằm trong `database/backups/`, có checksum và không đưa lên Git.
+- Admin tạo backup SQL trên trang **Backup & Restore**. Khi BE chạy bằng Node, file SQL và manifest nằm trong `database/backups/` trên máy.
+- Khi BE chạy trong Docker, đường dẫn `/app/database/backups` được gắn vào named volume: `omdrs-backend-local_backend_backups` với Compose BE riêng, hoặc `omdrs_app_backups` với Compose toàn ứng dụng. File không tự xuất hiện trong thư mục backup của source trên máy. Không xóa volume để dọn container; cần chủ động sao chép backup ra nơi lưu trữ độc lập.
+- Mỗi backup có checksum. Source Git không chứa backup thật hoặc dữ liệu đang chạy trong MySQL; clone/pull không mang theo dữ liệu của máy tác giả.
 - Restore tạo database mới `omdrs_restore_<uuid>` để đối chiếu, không ghi đè database đang sử dụng.
 - **Tài khoản MySQL chỉ được cấp quyền trên order_management không có quyền tạo database restore.** Restore cần quyền được người quản trị cấp riêng cho database cách ly; không mặc định đã được cấp. Không cấp quyền quản trị toàn server cho tài khoản runtime chỉ để thử chức năng này.
 - Lịch backup cấu hình bằng BACKUP_INTERVAL_HOURS; 0 là tắt. BACKUP_RETENTION_DAYS mặc định 30 ngày; dọn bản cũ sau các lần backup theo lịch thành công.
@@ -378,7 +400,7 @@ npm test -w backend
 Remove-Item Env:RUN_DB_INTEGRATION
 ```
 
-Test tạo schema ngẫu nhiên `omdrs_test_<uuid>` và database restore, giữ lại để kiểm tra, không tự DROP dữ liệu. Không mở rộng quyền tài khoản production chỉ để chạy test; dùng môi trường thử nghiệm riêng.
+Test dùng thông tin kết nối DB từ backend/.env hoặc biến môi trường, tạo schema ngẫu nhiên `omdrs_test_<uuid>` và database restore, giữ lại để kiểm tra, không tự DROP dữ liệu. Khi không chạy integration test, bỏ biến RUN_DB_INTEGRATION khỏi môi trường; không đặt bằng 0 vì mã hiện tại kiểm tra sự tồn tại của giá trị. Không mở rộng quyền tài khoản production chỉ để chạy test; dùng môi trường thử nghiệm riêng.
 
 [Thông tin kiểm thử khi xây dựng](docs/testing-report.md) là báo cáo theo thời điểm, không phải bảo đảm mọi máy tải về đã được cấu hình hoặc kiểm thử.
 
@@ -394,13 +416,28 @@ Test tạo schema ngẫu nhiên `omdrs_test_<uuid>` và database restore, giữ 
 | Duplicate entry khi tạo admin | Tài khoản đã có; bỏ qua user:create và dùng mật khẩu website đã đặt |
 | Đăng nhập không đúng | Dùng mật khẩu website ở bước 6, không dùng mật khẩu root/MySQL |
 | API báo 401 | Đăng nhập lại; phiên có thời hạn 8 giờ. Dùng cùng địa chỉ FE nhất quán, không đổi qua lại localhost và 127.0.0.1 |
-| EADDRINUSE / port already in use | Kiểm tra Terminal đã chạy dịch vụ chưa; không mở thêm bản trùng. Chỉ dừng tiến trình của mình |
-| FE chạy nhưng gọi API lỗi | BE phải chạy cổng 5000 theo frontend/vite.config.js; kiểm tra /health/ready |
+| EADDRINUSE / port already in use | Kiểm tra Terminal đã chạy dịch vụ chưa; không mở thêm bản trùng. Trên macOS, cổng 5000 có thể bị Control Center/AirPlay sử dụng: xem hướng dẫn đổi cổng dưới bảng; không dừng tiến trình hệ thống |
+| unable to get image ... Cannot connect to the Docker daemon | Lỗi Engine chưa sẵn sàng, không đồng nghĩa thiếu image. Mở Docker Desktop, chờ Engine running rồi chạy lại docker compose up |
+| FE chạy nhưng gọi API lỗi | Kiểm tra API_PROXY_TARGET trong frontend/.env: BE Node thường dùng 5000, BE Docker dùng 5002. Khởi động lại FE và kiểm tra readiness đúng cổng |
 | Monitoring Unknown | Chạy process Monitoring, kiểm tra MONITOR_URL và cùng MONITOR_TOKEN ở hai tệp, khởi động lại BE/Monitor |
 | Restore bị từ chối quyền | Tài khoản DB chưa được cấp quyền cho database cách ly; nhờ người quản trị cấp đúng phạm vi |
 | Lệnh read -s không chạy trên Windows | Dùng khối PowerShell ở bước 6 hoặc mở WSL2/Bash |
 
-Nếu đổi cổng BE, sửa cả `PORT` trong backend/.env, proxy ở frontend/vite.config.js và PRIMARY_URL của Monitoring. Nếu đổi cổng FE, cập nhật CORS_ORIGINS. Khởi động lại các dịch vụ liên quan. Không đưa secret vào biến VITE_*.
+### Khi cổng 5000 trên macOS bị chiếm
+
+Có thể chuyển sang cách B (BE Docker cổng 5002), hoặc giữ cách A và đổi cổng BE Node sang 5003:
+
+| Tệp | Giá trị cần sửa cho ví dụ BE Node cổng 5003 |
+|---|---|
+| backend/.env | PORT=5003 |
+| frontend/.env | API_PROXY_TARGET=http://127.0.0.1:5003, giữ VITE_API_BASE rỗng |
+| monitoring/.env, nếu có dùng | PRIMARY_URL=http://127.0.0.1:5003 |
+
+Khởi động lại các dịch vụ và kiểm tra http://127.0.0.1:5003/health/ready. Không cần sửa source vite.config.js. Đây là đổi cổng của **BE Node**; BE Docker ở bước 14 vẫn dùng cổng 5002 trên máy và 5000 trong container, không đổi PORT bên trong container tùy ý vì healthcheck cũng dùng 5000.
+
+Nếu đổi cổng FE, cập nhật CORS_ORIGINS theo địa chỉ FE thực tế. Không đưa secret vào biến VITE_*.
+
+Nếu PowerShell báo chặn `npm.ps1`, dùng `npm.cmd` thay cho `npm` trong các lệnh, hoặc dùng Terminal WSL2/Bash; không cần tắt bảo vệ hệ thống để chạy dự án.
 
 ## 13. Cấu trúc mã nguồn
 
@@ -427,7 +464,7 @@ docs/         Tài liệu kỹ thuật và runbook
 | npm run build | Build FE |
 | npm test | Chạy test mặc định |
 
-## 14. Chạy riêng Backend trong Docker
+## 14. Cách B — Chạy BE Docker, FE bằng Vite
 
 Cách này dành cho **Docker Desktop trên macOS/Windows**, sử dụng MySQL hiện có đã publish cổng 3306 trên máy, còn FE vẫn chạy bằng Vite. Với Linux Docker Engine cần kiểm tra thêm host gateway/network phù hợp; không mặc định host.docker.internal có sẵn.
 
@@ -475,17 +512,26 @@ Mở [website](http://127.0.0.1:5173) và đăng nhập như trước. Vite prox
 
 ```bash
 # Dừng BE trong Docker; không dừng MySQL
- docker compose -f docker/compose.backend.yml stop backend
+docker compose -f docker/compose.backend.yml stop backend
 
 # Chạy lại BE đã build
- docker compose -f docker/compose.backend.yml up -d
+docker compose -f docker/compose.backend.yml up -d
 
 # Nạp lại backend/.env sau khi thay đổi
- docker compose -f docker/compose.backend.yml up -d --force-recreate backend
+docker compose -f docker/compose.backend.yml up -d --force-recreate backend
 
 # Build lại sau khi sửa mã nguồn BE hoặc dependency
- docker compose -f docker/compose.backend.yml up -d --build
+docker compose -f docker/compose.backend.yml up -d --build
 ```
+
+### Những lần chạy tiếp theo với BE Docker
+
+1. Mở Docker Desktop, chờ Engine running; khởi động container MySQL hiện có nếu đang dừng.
+2. Chạy `docker compose -f docker/compose.backend.yml up -d`.
+3. Kiểm tra readiness ở cổng 5002.
+4. Đảm bảo frontend/.env trỏ tới cổng 5002, chạy `npm run dev -w frontend` và mở website.
+
+Không cần build lại khi chỉ tắt/mở Docker. Nếu sửa backend/.env, dùng `up -d --force-recreate backend`; `docker compose restart` không nạp lại biến môi trường mới. Không tạo lại schema/tài khoản đã tồn tại.
 
 Image chứa bản sao mã nguồn tại thời điểm build; không tự cập nhật khi sửa file trên máy. Nếu đổi cổng/host MySQL, kiểm tra `DB_PORT` trong backend/.env và `DB_HOST` được override trong compose trước khi tạo lại BE.
 
@@ -516,3 +562,30 @@ python3 scripts/package.py
 ```
 
 Trên Windows có thể dùng `py scripts/package.py`. Script bỏ dependency, secret, log, backup thật, build output và Git; ZIP xuất ở thư mục cha của dự án. Người nhận giải nén rồi bắt đầu lại từ bước 1.
+
+## 16. Cập nhật code ở máy đã cài
+
+Trong thư mục gốc repository:
+
+```bash
+git status
+git pull --ff-only
+npm ci
+```
+
+Nếu có thay đổi local, lưu hoặc commit thay đổi trước; không dùng reset/xóa tệp để ép cập nhật. Sau khi cập nhật:
+
+- Cách A: dừng và chạy lại BE/FE/Monitor tương ứng.
+- Cách B: chạy `docker compose -f docker/compose.backend.yml up -d --build`, rồi khởi động lại FE.
+- Giữ nguyên các tệp .env riêng của máy và dữ liệu MySQL. Đối chiếu .env.example để bổ sung biến cấu hình mới nếu có.
+- Không tự chạy lại db:init trên database đang có dữ liệu. Nếu bản cập nhật thay đổi schema, đọc hướng dẫn migration và sao lưu trước khi áp dụng; hiện dự án chỉ có schema/migration đầu tiên.
+
+## 17. Phạm vi đã xác minh và tài liệu tham khảo
+
+Đợt rà soát **27/10/2026**: sao chép các tệp source được Git theo dõi sang thư mục sạch, không mang theo .env thật, backup hoặc node_modules. `npm ci --offline` cài thành công từ cache npm; `npm run build` thành công; `npm test` có **16 đạt, 0 lỗi, 1 integration test được bỏ qua**. Cấu hình Compose BE qua kiểm tra cú pháp. Đây là kiểm tra khả năng cài từ lockfile với cache trên macOS, chưa phải thử đầy đủ tải dependency qua mạng hoặc khởi tạo MySQL mới trên mọi hệ điều hành.
+
+Luồng Node và BE Docker kết nối MySQL 8.4.13 đã chạy trên macOS trong quá trình xây dựng; build và các test mặc định đã chạy. Các khối lệnh PowerShell/Linux được viết theo từng shell nhưng chưa chạy thử toàn bộ trên máy Windows/Linux mới. Không coi nội dung README là chứng nhận production hoặc HA. Xem báo cáo kiểm thử để biết giới hạn từng thời điểm.
+
+- [Docker Desktop: kết nối mạng và publish cổng](https://docs.docker.com/desktop/features/networking/).
+- [Docker Desktop: container kết nối dịch vụ trên máy chủ](https://docs.docker.com/desktop/features/networking/how-tos/).
+- [MySQL 8.4: cấu hình và dữ liệu khi chạy Docker](https://dev.mysql.com/doc/refman/8.4/en/docker-mysql-more-topics.html).

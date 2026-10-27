@@ -1,6 +1,6 @@
 # Triển khai macOS
 
-Theo 16 bước README cho development. Không thay đổi Docker network hoặc cấu hình MySQL đang tồn tại tự động.
+Theo các mục 1–9 của README cho development; chọn mục 7 để chạy BE Node hoặc mục 14 để chạy riêng BE Docker. Không thay đổi Docker network hoặc cấu hình MySQL đang tồn tại tự động.
 
 ## Docker ứng dụng
 
