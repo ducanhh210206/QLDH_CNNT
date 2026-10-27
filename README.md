@@ -441,6 +441,8 @@ Nếu PowerShell báo chặn `npm.ps1`, dùng `npm.cmd` thay cho `npm` trong cá
 
 ## 13. Cấu trúc mã nguồn
 
+Xem [công dụng từng file trong dự án](docs/file-guide.md) để lần theo giao diện, API, SQL, Docker và script vận hành.
+
 ```text
 frontend/     React + Vite, trang và thành phần giao diện
 backend/      Express, middleware, controller, service, repository, test
