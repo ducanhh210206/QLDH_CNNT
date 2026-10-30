@@ -18,7 +18,13 @@ import {
 } from "../components/common";
 import { money, date } from "../services/api";
 import OrderDetail from "./OrderDetail";
-export default function OrderList({ navigate, notify, initialSearch = "" }) {
+import { can } from "../utils/permissions";
+export default function OrderList({
+  navigate,
+  notify,
+  user,
+  initialSearch = "",
+}) {
   const [search, setSearch] = useState(initialSearch),
     [query, setQuery] = useState(initialSearch),
     [status, setStatus] = useState(""),
@@ -50,10 +56,12 @@ export default function OrderList({ navigate, notify, initialSearch = "" }) {
         description="Tra cứu giao dịch, theo dõi tiến độ và cập nhật trạng thái."
       >
         <Refresh onClick={reload} />
-        <button className="button primary" onClick={() => navigate("create")}>
-          <Plus size={16} />
-          Tạo đơn hàng
-        </button>
+        {can(user, "orders.create") && (
+          <button className="button primary" onClick={() => navigate("create")}>
+            <Plus size={16} />
+            Tạo đơn hàng
+          </button>
+        )}
       </PageHeading>
       <Panel
         title="Tất cả đơn hàng"
@@ -196,6 +204,7 @@ export default function OrderList({ navigate, notify, initialSearch = "" }) {
       {id && (
         <OrderDetail
           id={id}
+          user={user}
           onClose={() => setId(null)}
           onChanged={reload}
           notify={notify}

@@ -6,12 +6,20 @@ import { rateLimit } from "express-rate-limit";
 import { randomUUID } from "node:crypto";
 import { env } from "./config/env.js";
 import { errorHandler } from "./middlewares/errorHandler.js";
-import { requireAuth, admin } from "./middlewares/authMiddleware.js";
+import {
+  requireAuth,
+  admin,
+  permission,
+} from "./middlewares/authMiddleware.js";
 import { authRoutes } from "./routes/authRoutes.js";
 import { orderRoutes } from "./routes/orderRoutes.js";
 import { adminRoutes } from "./routes/systemRoutes.js";
 import * as order from "./controllers/orderController.js";
 import { readiness } from "./services/healthService.js";
+import { userRoutes } from "./routes/userRoutes.js";
+import { productRoutes } from "./routes/productRoutes.js";
+import { transactions } from "./repositories/orderRepository.js";
+import { listParams } from "./middlewares/validateOrder.js";
 export const app = express();
 app.disable("x-powered-by");
 app.use(helmet());
@@ -35,14 +43,12 @@ app.use((req, res, next) => {
     req.get("Origin") &&
     !env.origins.includes(req.get("Origin"))
   )
-    return res
-      .status(403)
-      .json({
-        error: {
-          code: "ORIGIN_DENIED",
-          message: "Nguồn truy cập không được phép.",
-        },
-      });
+    return res.status(403).json({
+      error: {
+        code: "ORIGIN_DENIED",
+        message: "Nguồn truy cập không được phép.",
+      },
+    });
   next();
 });
 app.use(express.json({ limit: "32kb" }));
@@ -69,8 +75,26 @@ app.use(
 );
 app.use("/api/auth", authRoutes);
 app.use("/api/orders", requireAuth, orderRoutes);
-app.get("/api/dashboard/summary", requireAuth, order.summary);
-app.get("/api/dashboard/order-statistics", requireAuth, order.statistics);
+app.get(
+  "/api/dashboard/summary",
+  requireAuth,
+  permission("statistics.read"),
+  order.summary,
+);
+app.get(
+  "/api/dashboard/order-statistics",
+  requireAuth,
+  permission("statistics.read"),
+  order.statistics,
+);
+app.use("/api/products", requireAuth, productRoutes);
+app.get(
+  "/api/transactions",
+  requireAuth,
+  permission("transactions.read"),
+  async (req, res) => res.json(await transactions(listParams(req.query))),
+);
+app.use("/api/admin/users", requireAuth, admin, userRoutes);
 app.use("/api/admin", requireAuth, admin, adminRoutes);
 app.use((req, res) =>
   res

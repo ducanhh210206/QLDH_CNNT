@@ -1,5 +1,29 @@
 # Báo cáo kiểm thử và nghiệm thu
 
+## Cập nhật ngày 30/10/2026 — quản lý cấp tài khoản
+
+- **33/33 kiểm thử đạt**, không bỏ qua, gồm MySQL và migration trên container riêng. Tài khoản do Quản lý tạo là Staff/Active, đăng nhập ngay bằng mật khẩu và chỉ dùng các quyền đã chọn.
+- Đã kiểm tra từ chối nhân viên gọi API tạo tài khoản, từ chối role/trạng thái tự gửi, mật khẩu ngắn, quyền quản trị và quyền thiếu điều kiện xem; kiểm tra lại quyền Quản lý trong transaction khi có thay đổi đồng thời.
+- Trùng username/email trả 409, không ghi đè. Mật khẩu được băm, không trả về hoặc ghi trong lịch sử; tài khoản và lịch sử được ghi trong một transaction. Backup/restore chứa bản ghi cấp tài khoản mới đã đối chiếu thành công.
+- Danh sách tài khoản mặc định Active, hiển thị thông tin và quyền cấp, ngày tạo/cập nhật quyền và ghi chú. Đã kiểm tra hiển thị hai tài khoản thử, mở danh sách quyền và mở lại biểu mẫu tạo tài khoản. Ảnh: [tài khoản đã cấp](issued-accounts-preview.png).
+- Build FE đạt. Đã mở biểu mẫu trên trình duyệt của bản chạy riêng, xác nhận trường thông tin/mật khẩu/quyền. Không tạo tài khoản thật trong database đang dùng. Ảnh: [biểu mẫu cấp tài khoản](create-staff-preview.png).
+- Hướng dẫn và API cập nhật trong [phân quyền](auth-permissions.md) và README. Không cần schema mới ngoài 002. Chưa có email bàn giao tự động hoặc bắt buộc đổi mật khẩu lần đầu.
+
+## Cập nhật ngày 29/10/2026 — phân quyền và xét duyệt
+
+Kết quả mới dưới đây bổ sung cho báo cáo lịch sử ngày 26/10 ở phía sau; các mục NOT TESTED cũ phản ánh thời điểm cũ.
+
+- **31/31 kiểm thử đạt**, không bỏ qua: unit/HTTP, MySQL tích hợp và migration. Chạy trên container MySQL 8.4 riêng; container đã dừng sau kiểm thử, dữ liệu kiểm thử giữ trong volume riêng.
+- Đã kiểm tra đăng ký luôn Staff/Pending, không tự cấp quyền; đăng nhập trước duyệt bị từ chối; quản lý duyệt/cấp từng quyền; nhân viên bị chặn API quản trị; tạm khóa/đổi quyền thu hồi phiên; hai quản lý thay đổi quyền đồng thời vẫn giữ quản lý hoạt động.
+- Đã kiểm tra tài khoản Google mới chờ duyệt, không tự gộp theo email, state/nonce/PKCE và dữ liệu sản phẩm. **Chưa đăng nhập Google thật** vì chủ dự án chưa cấu hình OAuth Client ID/Secret.
+- Backup/restore tích hợp xác minh dữ liệu của cả 12 bảng. Migration 001 → 002 chạy lại được và giữ nguyên tài khoản/đơn cũ.
+- Giao diện trình duyệt kiểm tra thực tế ở localhost:5180, dùng database và tài khoản thử riêng: đăng ký → chờ duyệt → quản lý cấp quyền → nhân viên đăng nhập → chỉ có menu được cấp → thêm sản phẩm thành công. Tên tiếng Việt và giá 12.000 ₫ hiển thị đúng. Ảnh: [xét duyệt](access-approval-preview.png), [menu nhân viên](staff-permissions-preview.png).
+- `npm run build` đạt; CSS 27,24 KB, JS 260,84 KB trước gzip.
+- Database cục bộ đang dùng đã được nâng cấp 002 sau khi tạo SQL snapshot bảo vệ + SHA-256. Đối chiếu đơn hàng và các trường tài khoản cũ trước/sau trùng khớp. Backend Docker có readiness Healthy sau nâng cấp.
+- Google hiện trả `google.enabled=false` cho đến khi có cấu hình riêng. Xem [hướng dẫn cấu hình và sử dụng](auth-permissions.md).
+
+## Báo cáo lịch sử ngày 26/10/2026
+
 Ngày: **26/10/2026**, múi giờ Việt Nam. Đây là kết quả chạy thật trong phiên xây dựng, không phải cam kết đã vận hành production.
 
 ## Kết quả lệnh đã chạy

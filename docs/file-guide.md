@@ -1,6 +1,6 @@
 # Công dụng từng file trong dự án OMDRS
 
-Tài liệu bao quát **86 file nguồn/tài liệu** (bao gồm chính tài liệu này). Các đường dẫn bên dưới tính từ thư mục gốc repository, nơi có package.json. Không tính từng file do npm tạo trong node_modules hoặc file build tự sinh.
+Tài liệu giải thích các file nguồn và tài liệu của dự án, bao gồm phần phân quyền và đăng nhập Google cập nhật ngày 29/10/2026. Các đường dẫn bên dưới tính từ thư mục gốc repository, nơi có package.json. Không tính từng file do npm tạo trong node_modules hoặc file build tự sinh.
 
 ## Nắm nhanh trước khi đọc
 
@@ -50,7 +50,7 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 
 | File | Công dụng |
 |---|---|
-| [frontend/src/pages/Login.jsx](../frontend/src/pages/Login.jsx) | Biểu mẫu đăng nhập website; gọi API xác thực, hiển thị lỗi và gợi ý thiết lập lần đầu. |
+| [frontend/src/pages/Login.jsx](../frontend/src/pages/Login.jsx) | Đăng nhập, đăng ký nhân viên chờ duyệt, thông báo xét duyệt và bắt đầu đăng nhập Google khi được cấu hình. |
 | [frontend/src/pages/Dashboard.jsx](../frontend/src/pages/Dashboard.jsx) | Tổng quan: số đơn, doanh thu đơn Completed, phân bố trạng thái, biểu đồ số đơn theo ngày và các đơn gần đây; lấy dữ liệu từ API. |
 | [frontend/src/pages/CreateOrder.jsx](../frontend/src/pages/CreateOrder.jsx) | Biểu mẫu tạo đơn. Kiểm tra dữ liệu, giữ bản nháp và yêu cầu đang chờ trên trình duyệt; gửi cùng idempotency key khi thử lại để tránh tạo trùng. |
 | [frontend/src/pages/OrderList.jsx](../frontend/src/pages/OrderList.jsx) | Bảng đơn hàng: tìm kiếm, lọc trạng thái, sắp xếp, phân trang, làm mới và mở chi tiết. |
@@ -108,7 +108,7 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 | File | Công dụng |
 |---|---|
 | [backend/src/repositories/orderRepository.js](../backend/src/repositories/orderRepository.js) | Chứa SQL đọc/ghi đơn, tìm kiếm/phân trang, chống trùng yêu cầu, khóa/version khi cập nhật, lịch sử và thống kê. Cập nhật đơn/lịch sử trong cùng transaction. |
-| [backend/src/repositories/userRepository.js](../backend/src/repositories/userRepository.js) | SQL tìm người dùng, kiểm tra session còn hạn, tạo và xóa session khi đăng nhập/đăng xuất. |
+| [backend/src/repositories/userRepository.js](../backend/src/repositories/userRepository.js) | SQL đăng ký Pending, tài khoản Google, phiên đăng nhập, danh sách nhân viên, xét duyệt và lịch sử quyền; thu hồi session khi đổi quyền. |
 | [backend/src/jobs/backupJob.js](../backend/src/jobs/backupJob.js) | Chạy backup theo BACKUP_INTERVAL_HOURS trên instance primary và dọn bản cũ sau lần backup lịch thành công; mặc định tắt. |
 | [backend/src/utils/errors.js](../backend/src/utils/errors.js) | Định nghĩa AppError và hàm fail để chủ động trả lỗi có HTTP status, mã lỗi và thông báo nghiệp vụ. |
 | [backend/src/utils/integrity.js](../backend/src/utils/integrity.js) | Chuẩn hóa dữ liệu, tạo SHA-256 và so sánh đơn trước/sau để tìm bản ghi thiếu, phát sinh hoặc bị thay đổi. |
@@ -126,8 +126,8 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 
 | File | Công dụng |
 |---|---|
-| [database/init/schema.sql](../database/init/schema.sql) | Định nghĩa 9 bảng ứng dụng, cột, khóa, index và ràng buộc; ghi migration 001_initial. Là file init-db.js thực sự đọc để khởi tạo lần đầu. |
-| [database/migrations/001_initial.sql](../database/migrations/001_initial.sql) | Lưu phiên bản migration đầu tiên, hiện cùng cấu trúc schema.sql. Chưa có bộ tự động chạy migration tăng dần; không chạy cả hai trên database đã có bảng. |
+| [database/init/schema.sql](../database/init/schema.sql) | Định nghĩa 12 bảng ứng dụng, cột, khóa, index và ràng buộc; ghi migration 001_initial và 002_user_access. Là file init-db.js thực sự đọc để khởi tạo lần đầu. |
+| [database/migrations/001_initial.sql](../database/migrations/001_initial.sql) | Lưu cấu trúc phiên bản đầu tiên trước phần phân quyền mới; giữ làm lịch sử và kiểm thử nâng cấp. Không chạy lại trên database đang có dữ liệu. |
 | [database/seeds/sample_orders.sql](../database/seeds/sample_orders.sql) | Hiện chỉ chứa chú thích/hướng dẫn, chưa có INSERT dữ liệu mẫu. Đơn hàng phải tạo qua ứng dụng hoặc test cách ly. |
 | [database/backups/.gitkeep](../database/backups/.gitkeep) | File giữ thư mục backup trong Git khi chưa có bản sao lưu; không chứa dữ liệu MySQL. |
 
@@ -170,6 +170,33 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 | [docs/testing-report.md](../docs/testing-report.md) | Báo cáo kiểm thử theo thời điểm, phân biệt phần đạt/chưa kiểm thử/chưa cấu hình. Không phải chứng nhận mọi máy clone về đều đã chạy được. |
 | [docs/login-preview.png](../docs/login-preview.png) | Ảnh chụp màn hình đăng nhập để minh họa/kiểm tra giao diện; ứng dụng không dùng ảnh này để render login. |
 | [docs/file-guide.md](../docs/file-guide.md) | Tài liệu bạn đang đọc: giải thích công dụng từng file và cách lần theo luồng xử lý. |
+
+## Các file bổ sung cho phân quyền và Google (29/10/2026)
+
+| File | Công dụng |
+|---|---|
+| [backend/src/config/permissions.js](../backend/src/config/permissions.js) | Danh sách quyền nhân viên và dữ liệu người dùng được phép trả về API; Quản lý có quyền quản trị. |
+| [backend/src/controllers/googleAuthController.js](../backend/src/controllers/googleAuthController.js) | Bắt đầu đăng nhập Google và nhận callback; chuyển kết quả về FE. |
+| [backend/src/controllers/userController.js](../backend/src/controllers/userController.js) | Kiểm tra dữ liệu khi quản lý duyệt hoặc đổi quyền nhân viên. |
+| [backend/src/repositories/productRepository.js](../backend/src/repositories/productRepository.js) | Truy vấn danh mục và thêm sản phẩm với SKU duy nhất. |
+| [backend/src/routes/productRoutes.js](../backend/src/routes/productRoutes.js) | API sản phẩm, kiểm tra quyền xem/thêm tại máy chủ. |
+| [backend/src/routes/userRoutes.js](../backend/src/routes/userRoutes.js) | API quản lý tài khoản và lịch sử xét duyệt dành cho Quản lý. |
+| [backend/src/services/googleAuthService.js](../backend/src/services/googleAuthService.js) | OAuth Google: state, nonce, PKCE, xác minh ID token và tạo phiên sau khi tài khoản được duyệt. |
+| [backend/src/services/productService.js](../backend/src/services/productService.js) | Kiểm tra SKU, tên và giá sản phẩm trước khi ghi MySQL. |
+| [backend/src/utils/authCookies.js](../backend/src/utils/authCookies.js) | Cookie phiên đăng nhập và cookie tạm của OAuth. |
+| [backend/tests/access.test.js](../backend/tests/access.test.js) | Kiểm thử đăng ký, trạng thái tài khoản, quyền API, OAuth và sản phẩm. |
+| [backend/tests/migration.integration.test.js](../backend/tests/migration.integration.test.js) | Chạy migration 002 trên schema MySQL riêng, kiểm tra dữ liệu cũ và khả năng chạy lại. |
+| [database/migrations/002_user_access.sql](../database/migrations/002_user_access.sql) | Cột trạng thái/quyền/Google trong users; bảng sản phẩm, lịch sử quyền và OAuth state. |
+| [frontend/src/pages/Products.jsx](../frontend/src/pages/Products.jsx) | Danh mục, tìm kiếm và thêm sản phẩm theo quyền. |
+| [frontend/src/pages/TransactionHistory.jsx](../frontend/src/pages/TransactionHistory.jsx) | Tra cứu lịch sử tạo/chuyển trạng thái đơn hàng. |
+| [frontend/src/pages/UserManagement.jsx](../frontend/src/pages/UserManagement.jsx) | Quản lý xét duyệt nhân viên, cấp quyền, tạm khóa và xem lịch sử thay đổi. |
+| [frontend/src/utils/permissions.js](../frontend/src/utils/permissions.js) | Hàm kiểm tra quyền và nhãn tiếng Việt để hiển thị menu/chức năng. |
+| [scripts/migrate-db.js](../scripts/migrate-db.js) | Nâng cấp schema đang có lên 002; khóa MySQL, tạo snapshot bảo vệ trước DDL và hỗ trợ chạy lại. |
+| [docs/auth-permissions.md](../docs/auth-permissions.md) | Hướng dẫn phân quyền, xét duyệt, nâng cấp database và cấu hình Google OAuth. |
+| [docs/issued-accounts-preview.png](../docs/issued-accounts-preview.png) | Ảnh danh sách tài khoản đã cấp và các quyền bằng dữ liệu thử cách ly. |
+| [docs/create-staff-preview.png](../docs/create-staff-preview.png) | Ảnh biểu mẫu quản lý tạo và cấp quyền tài khoản nhân viên. |
+| [docs/access-approval-preview.png](../docs/access-approval-preview.png) | Ảnh màn hình cấp quyền với dữ liệu thử nghiệm cách ly. |
+| [docs/staff-permissions-preview.png](../docs/staff-permissions-preview.png) | Ảnh menu nhân viên sau khi được duyệt, dùng tài khoản kiểm thử. |
 
 ## File cục bộ hoặc tự sinh — không đưa lên Git
 

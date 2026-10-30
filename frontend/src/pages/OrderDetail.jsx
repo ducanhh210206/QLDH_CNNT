@@ -8,9 +8,12 @@ import {
   Panel,
 } from "../components/common";
 import { api, money, date, statusName } from "../services/api";
-export default function OrderDetail({ id, onClose, onChanged, notify }) {
+import { can } from "../utils/permissions";
+export default function OrderDetail({ id, onClose, onChanged, notify, user }) {
   const order = useData("/api/orders/" + id),
-    history = useData("/api/orders/" + id + "/history");
+    history = useData(
+      can(user, "transactions.read") ? "/api/orders/" + id + "/history" : null,
+    );
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
   async function update(status) {
@@ -59,7 +62,7 @@ export default function OrderDetail({ id, onClose, onChanged, notify }) {
                 </div>
               ))}
             </div>
-            {o.status === "Pending" && (
+            {o.status === "Pending" && can(user, "orders.update") && (
               <div className="form-footer">
                 <button
                   disabled={busy}
@@ -77,21 +80,25 @@ export default function OrderDetail({ id, onClose, onChanged, notify }) {
                 </button>
               </div>
             )}
-            <h3 className="section-title">Lịch sử thay đổi</h3>
-            <ErrorBox error={history.error} />
-            <ol className="timeline">
-              {history.data?.map((h) => (
-                <li key={h.id}>
-                  <strong>
-                    {h.old_status ? statusName(h.old_status) + " → " : ""}
-                    {statusName(h.new_status)}
-                  </strong>
-                  <p>
-                    {h.username} · {date(h.created_at)}
-                  </p>
-                </li>
-              ))}
-            </ol>
+            {can(user, "transactions.read") && (
+              <>
+                <h3 className="section-title">Lịch sử thay đổi</h3>
+                <ErrorBox error={history.error} />
+                <ol className="timeline">
+                  {history.data?.map((h) => (
+                    <li key={h.id}>
+                      <strong>
+                        {h.old_status ? statusName(h.old_status) + " → " : ""}
+                        {statusName(h.new_status)}
+                      </strong>
+                      <p>
+                        {h.username} · {date(h.created_at)}
+                      </p>
+                    </li>
+                  ))}
+                </ol>
+              </>
+            )}
           </>
         )
       )}

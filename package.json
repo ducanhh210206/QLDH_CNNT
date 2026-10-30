@@ -12,9 +12,11 @@
     "build": "npm run build -w frontend",
     "test": "npm test -w backend",
     "db:init": "npm run db:init -w backend",
-    "user:create": "npm run user:create -w backend"
+    "user:create": "npm run user:create -w backend",
+    "db:migrate": "npm run db:migrate -w backend"
   },
   "devDependencies": {
     "concurrently": "9.2.5"
-  }
+  },
+  "type": "module"
 }

@@ -18,6 +18,9 @@ import {
   X,
   ArrowUpRight,
   ShieldCheck,
+  Users,
+  PackagePlus,
+  History,
 } from "lucide-react";
 import { api } from "./services/api";
 import Login from "./pages/Login";
@@ -28,14 +31,21 @@ import SystemMonitoring from "./pages/SystemMonitoring";
 import IncidentManagement from "./pages/IncidentManagement";
 import BackupRestore from "./pages/BackupRestore";
 import SettingsPage from "./pages/Settings";
+import Products from "./pages/Products";
+import TransactionHistory from "./pages/TransactionHistory";
+import UserManagement from "./pages/UserManagement";
+import { can, roleLabel } from "./utils/permissions";
 const nav = [
-  ["dashboard", "Tổng quan", LayoutDashboard],
-  ["orders", "Quản lý đơn hàng", ShoppingBag],
-  ["create", "Tạo đơn hàng", Plus],
-  ["monitoring", "Giám sát hệ thống", Activity, true],
-  ["incidents", "Quản lý sự cố", TriangleAlert, true],
-  ["backups", "Backup & Restore", Database, true],
-  ["settings", "Cài đặt", Settings],
+  ["dashboard", "Thống kê", LayoutDashboard, "statistics.read"],
+  ["products", "Sản phẩm", PackagePlus, "products.read"],
+  ["orders", "Quản lý đơn hàng", ShoppingBag, "orders.read"],
+  ["create", "Tạo đơn hàng", Plus, "orders.create"],
+  ["transactions", "Lịch sử giao dịch", History, "transactions.read"],
+  ["users", "Nhân viên & phê duyệt", Users, "users.manage"],
+  ["backups", "Sao lưu & phục hồi", Database, "backups.manage"],
+  ["monitoring", "Giám sát hệ thống", Activity, "system.manage"],
+  ["incidents", "Quản lý sự cố", TriangleAlert, "system.manage"],
+  ["settings", "Tài khoản", Settings, null],
 ];
 export default function App() {
   const [user, setUser] = useState(null),
@@ -56,6 +66,29 @@ export default function App() {
       .catch(() => {})
       .finally(() => setChecking(false));
   }, []);
+  useEffect(() => {
+    if (!user?.id) return;
+    let active = true;
+    const refresh = async () => {
+      try {
+        const latest = await api("/api/auth/me");
+        if (active) setUser(latest);
+      } catch (e) {
+        if (active && [401, 403].includes(e.status)) {
+          setUser(null);
+          setPage("dashboard");
+          setToast(
+            "Phiên hoặc quyền truy cập đã thay đổi. Vui lòng đăng nhập lại.",
+          );
+        }
+      }
+    };
+    const timer = setInterval(refresh, 15000);
+    return () => {
+      active = false;
+      clearInterval(timer);
+    };
+  }, [user?.id]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("omdrs-theme", theme);
@@ -100,6 +133,10 @@ export default function App() {
       </div>
     );
   if (!user) return <Login onLogin={setUser} />;
+  const allowedNav = nav.filter((n) => !n[3] || can(user, n[3]));
+  const currentPage = allowedNav.some((n) => n[0] === page)
+    ? page
+    : allowedNav[0][0];
   const props = { navigate, notify: setToast, user, theme, toggleTheme };
   return (
     <div className="app-shell">
@@ -114,7 +151,9 @@ export default function App() {
           <span>
             omdrs<span className="brand-dot">.</span>
           </span>
-          <span className="brand-version">ADMIN</span>
+          <span className="brand-version">
+            {user.role === "Admin" ? "QUẢN LÝ" : "NHÂN VIÊN"}
+          </span>
         </div>
         <div className="workspace-switch">
           <span className="workspace-icon">O</span>
@@ -126,45 +165,43 @@ export default function App() {
         </div>
         <div className="nav-label">KHÔNG GIAN LÀM VIỆC</div>
         <nav>
-          {nav
-            .filter((n) => !n[3] || user.role === "Admin")
-            .map(([key, label, Icon], i) => (
-              <button
-                key={key}
-                onClick={() => navigate(key)}
-                className={
-                  (page === key ? "active " : "") +
-                  (key === "monitoring" ? "nav-separated" : "")
-                }
-              >
-                <Icon size={18} />
-                <span>{label}</span>
-                {page === key && <span className="nav-active-dot" />}
-              </button>
-            ))}
-        </nav>
-        <div className="sidebar-bottom">
-          <div className="trust-card">
-            <ShieldCheck size={20} />
-            <strong>Sẵn sàng phục hồi</strong>
-            <p>Kiểm chứng bản sao lưu trước khi đưa dữ liệu vào vận hành.</p>
+          {allowedNav.map(([key, label, Icon], i) => (
             <button
-              onClick={() =>
-                navigate(user.role === "Admin" ? "backups" : "dashboard")
+              key={key}
+              onClick={() => navigate(key)}
+              className={
+                (currentPage === key ? "active " : "") +
+                (key === "monitoring" ? "nav-separated" : "")
               }
             >
-              Khám phá workspace <ArrowUpRight size={14} />
+              <Icon size={18} />
+              <span>{label}</span>
+              {currentPage === key && <span className="nav-active-dot" />}
             </button>
-          </div>
+          ))}
+        </nav>
+        <div className="sidebar-bottom">
+          {user.role === "Admin" && (
+            <div className="trust-card">
+              <ShieldCheck size={20} />
+              <strong>Sẵn sàng phục hồi</strong>
+              <p>Kiểm chứng bản sao lưu trước khi đưa dữ liệu vào vận hành.</p>
+              <button
+                onClick={() =>
+                  navigate(user.role === "Admin" ? "backups" : "dashboard")
+                }
+              >
+                Khám phá workspace <ArrowUpRight size={14} />
+              </button>
+            </div>
+          )}
           <button className="profile" onClick={logout} title="Đăng xuất">
             <span className="avatar">
-              {user.username.slice(0, 1).toUpperCase()}
+              {(user.full_name || user.username).slice(0, 1).toUpperCase()}
             </span>
             <div>
-              <strong>{user.username}</strong>
-              <small>
-                {user.role === "Admin" ? "Quản trị viên" : "Nhân viên"}
-              </small>
+              <strong>{user.full_name || user.username}</strong>
+              <small>{roleLabel(user)}</small>
             </div>
             <LogOut size={17} />
           </button>
@@ -182,26 +219,28 @@ export default function App() {
             </button>
             <span>Workspace</span>
             <span>/</span>
-            <strong>{nav.find((n) => n[0] === page)?.[1]}</strong>
+            <strong>{nav.find((n) => n[0] === currentPage)?.[1]}</strong>
           </div>
           <div className="top-actions">
-            <form
-              className="global-search"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setOrderSearch(search);
-                navigate("orders");
-              }}
-            >
-              <Search size={16} />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Tìm đơn hàng…"
-                aria-label="Tìm kiếm toàn cục"
-              />
-              <kbd>↵</kbd>
-            </form>
+            {can(user, "orders.read") && (
+              <form
+                className="global-search"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  setOrderSearch(search);
+                  navigate("orders");
+                }}
+              >
+                <Search size={16} />
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Tìm đơn hàng…"
+                  aria-label="Tìm kiếm toàn cục"
+                />
+                <kbd>↵</kbd>
+              </form>
+            )}
             <span
               className={
                 "connection " + (online ? "connected" : "disconnected")
@@ -236,23 +275,29 @@ export default function App() {
             <p>
               {online
                 ? "Backend và MySQL vừa phản hồi kiểm tra readiness."
-                : "Kết nối chưa sẵn sàng. Kiểm tra trang Giám sát hệ thống."}
+                : "Kết nối chưa sẵn sàng. Vui lòng thử lại hoặc liên hệ quản lý."}
             </p>
             <small>Kiểm tra định kỳ 15 giây</small>
           </div>
         )}
-        <div className="page-content">
-          {page === "dashboard" ? (
+        <div className="page-content" key={user.id}>
+          {currentPage === "dashboard" ? (
             <Dashboard {...props} />
-          ) : page === "orders" ? (
+          ) : currentPage === "products" ? (
+            <Products {...props} />
+          ) : currentPage === "transactions" ? (
+            <TransactionHistory {...props} />
+          ) : currentPage === "users" ? (
+            <UserManagement {...props} />
+          ) : currentPage === "orders" ? (
             <OrderList {...props} initialSearch={orderSearch} />
-          ) : page === "create" ? (
+          ) : currentPage === "create" ? (
             <CreateOrder {...props} />
-          ) : page === "monitoring" ? (
+          ) : currentPage === "monitoring" ? (
             <SystemMonitoring {...props} />
-          ) : page === "incidents" ? (
+          ) : currentPage === "incidents" ? (
             <IncidentManagement {...props} />
-          ) : page === "backups" ? (
+          ) : currentPage === "backups" ? (
             <BackupRestore {...props} />
           ) : (
             <SettingsPage {...props} />

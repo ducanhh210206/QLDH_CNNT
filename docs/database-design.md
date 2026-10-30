@@ -19,3 +19,7 @@ Index trên status/created_at, created_at, customer_name, lịch sử order/time
 Pool giới hạn 10 connection, timeout 5 giây, hàng đợi 50. Mỗi kết nối dùng timezone UTC. Tiền API gửi chuỗi thập phân để tránh sai số JS; MySQL quyết định giá trị lưu. Không sửa schema hiện có hoặc tự áp dụng DDL khi startup. Migration tiếp theo phải được review cùng backup và thử trên bản phục hồi.
 
 Idempotency record không tự hết hạn để tránh tạo lại đơn sau sự cố kéo dài. Session hết hạn bị từ chối; cần chính sách dọn session cũ trong vận hành quy mô lớn. Không có API xóa đơn hàng thật.
+
+## Schema 002
+
+users bổ sung email, full_name, google_sub duy nhất, auth_provider, email_verified, account_status, permissions JSON, access_version, thông tin xét duyệt. password_hash cho phép NULL cho Google. Thêm products, user_access_history và oauth_login_attempts. Xem [hướng dẫn migration và phê duyệt](auth-permissions.md).

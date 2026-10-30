@@ -7,16 +7,20 @@ try {
     !NEW_USERNAME ||
     !NEW_PASSWORD ||
     NEW_PASSWORD.length < 12 ||
+    NEW_PASSWORD.length > 256 ||
+    NEW_USERNAME.length > 100 ||
     !["Admin", "Staff"].includes(NEW_ROLE)
   )
     throw Error(
       "Cung cấp NEW_USERNAME, NEW_PASSWORD tối thiểu 12 ký tự và NEW_ROLE=Admin hoặc Staff qua môi trường.",
     );
   await pool.execute(
-    "INSERT INTO users(id,username,password_hash,role) VALUES(?,?,?,?)",
+    "INSERT INTO users(id,username,password_hash,role,account_status,permissions) VALUES(?,?,?,?,'Active',NULL)",
     [randomUUID(), NEW_USERNAME, await hashPassword(NEW_PASSWORD), NEW_ROLE],
   );
-  console.log("Đã tạo tài khoản " + NEW_USERNAME + " (" + NEW_ROLE + ").");
+  console.log(
+    "Đã tạo tài khoản đã duyệt " + NEW_USERNAME + " (" + NEW_ROLE + ").",
+  );
 } finally {
   await pool.end();
 }

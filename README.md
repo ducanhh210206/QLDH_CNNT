@@ -2,9 +2,27 @@
 
 Website quản lý đơn hàng với **React 19 + Vite 8**, **Node.js + Express 5**, **MySQL 8.4** và dịch vụ giám sát độc lập.
 
-Chức năng chính: đăng nhập Admin/Staff, tạo và tìm kiếm đơn hàng, cập nhật trạng thái có lịch sử, dashboard thống kê, giám sát, sao lưu SQL, phục hồi vào database cách ly và mô phỏng quy trình xử lý sự cố.
+Chức năng chính: đăng nhập Nhân viên/Quản lý, tự đăng ký nhân viên hoặc được quản lý cấp tài khoản, phê duyệt tài khoản và cấp quyền, đăng nhập Google khi đã cấu hình OAuth, danh mục sản phẩm, đơn hàng, thống kê, lịch sử giao dịch, giám sát và backup/restore cách ly.
 
 > Hướng dẫn này dành cho người tải mã nguồn về máy mới. Repository không chứa tài khoản, mật khẩu, database hay dữ liệu trên máy tác giả. Người chạy phải tự cấu hình môi trường và tạo tài khoản website.
+
+## Bắt đầu từ đâu?
+
+| Trường hợp | Các bước cần làm |
+|---|---|
+| Clone/giải nén lần đầu, chưa có database | Bước 1–6: cài phần mềm, `npm ci`, tạo MySQL, cấu hình `.env`, khởi tạo schema và tạo Quản lý đầu tiên; sau đó bước 7 hoặc 14 |
+| Đã cài bản cũ, vừa pull code mới | Bước 16: cập nhật thư viện, nâng cấp schema bằng `db:migrate` trước khi chạy BE mới; giữ database và tài khoản cũ |
+| Chỉ mở lại dự án đã thiết lập xong | Khởi động MySQL, BE và FE; xem “Những lần chạy tiếp theo” ở bước 7 hoặc 14 |
+
+Mọi lệnh `npm` và `docker compose` bên dưới chạy trong **thư mục chứa `package.json`**. Nếu clone bằng lệnh trong README, thư mục đó là `omdrs/`. Trên máy tác giả, nó là `WEb_QLDH/order-management-system/`; người tải về không cần tạo lại đường dẫn cá nhân này.
+
+## Cập nhật phân quyền và đăng nhập Google
+
+Bản mới có **Nhân viên / Quản lý** (giữ giá trị API Staff/Admin). Nhân viên tự đăng ký phải chờ quản lý duyệt; Google lần đầu cũng chờ duyệt. Quản lý chọn quyền chức năng và có quyền sao lưu/phục hồi.
+
+**Máy đã có database từ bản cũ:** dùng `npm run db:migrate` với quyền provisioning phù hợp, sau đó build lại BE; không chạy lại db:init. Runner tạo safety snapshot trước khi bổ sung schema. Xem [hướng dẫn phân quyền, migration và Google OAuth](docs/auth-permissions.md).
+
+**Máy cài mới:** làm theo các bước bên dưới; db:init tạo cả schema 001 và 002. Client ID/Secret Google không nằm trong Git: tự cấu hình để bật nút đăng nhập Google.
 
 ## Chọn cách chạy trước khi cài
 
@@ -95,7 +113,7 @@ exit;
 ```
 
 - Nếu `order_management` chưa tồn tại hoặc rỗng: có thể khởi tạo ở bước 5.
-- Nếu đã có các bảng OMDRS từ lần chạy trước: giữ nguyên, bỏ qua bước khởi tạo và dùng tài khoản website đã tạo.
+- Nếu đã có các bảng OMDRS từ lần chạy trước: giữ nguyên, bỏ qua bước khởi tạo và dùng tài khoản website đã tạo. Nếu vừa cập nhật từ bản cũ, làm migration ở bước 16 trước khi chạy BE mới.
 - Nếu có bảng của ứng dụng khác hoặc chưa biết nguồn dữ liệu: dừng khởi tạo để kiểm tra, không ghi đè.
 - Dùng tài khoản MySQL riêng cho ứng dụng. Tài khoản khởi tạo cần quyền tạo database `order_management` nếu chưa có, tạo bảng/index/foreign key và quyền đọc/ghi. Tài khoản chạy thường ngày cần SELECT/INSERT/UPDATE/DELETE trên schema ứng dụng.
 
@@ -183,7 +201,7 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 
 Dán kết quả vào JWT_SECRET, không giữ chuỗi mẫu. Secret này khác mật khẩu MySQL và không đưa vào Frontend.
 
-**Sau mỗi lần sửa `backend/.env`, dừng BE bằng Control + C rồi chạy lại để nạp cấu hình mới.** Không chỉ tải lại trang web.
+**Sau mỗi lần sửa `backend/.env`:** BE chạy Node cần dừng bằng Control + C rồi chạy lại; BE Docker cần `docker compose -f docker/compose.backend.yml up -d --force-recreate backend`. Không chỉ tải lại trang web.
 
 ### Chọn cổng Backend mà FE gọi tới
 
@@ -221,10 +239,10 @@ Remove-Item Env:CONFIRM_EMPTY_DATABASE
 Kết quả mong đợi:
 
 ```text
-Schema 001 đã được áp dụng.
+Schema 001 và 002 đã được áp dụng.
 ```
 
-Script tạo database nếu chưa có, tạo các bảng từ `database/init/schema.sql` và ghi phiên bản migration. Script từ chối nếu database đã có bất kỳ bảng nào. **Không xóa bảng để chạy lại.** Nếu khởi tạo bị gián đoạn, kiểm tra các bảng đã tạo trước khi sửa tiếp vì DDL MySQL không rollback toàn bộ.
+Script tạo database nếu chưa có, tạo các bảng từ `database/init/schema.sql` và ghi phiên bản migration 001 và 002. Script từ chối nếu database đã có bất kỳ bảng nào. **Không xóa bảng để chạy lại.** Nếu khởi tạo bị gián đoạn, kiểm tra các bảng đã tạo trước khi sửa tiếp vì DDL MySQL không rollback toàn bộ.
 
 ## 6. Tạo tài khoản đăng nhập website — chỉ thực hiện lần đầu
 
@@ -270,10 +288,58 @@ try {
 Khi nhập mật khẩu ẩn, Terminal không hiện ký tự. Nhập xong nhấn Enter. Kết quả mong đợi:
 
 ```text
-Đã tạo tài khoản admin (Admin).
+Đã tạo tài khoản đã duyệt admin (Admin).
 ```
 
-Chỉ tạo một lần. Nếu báo `ER_DUP_ENTRY` / `Duplicate entry` cho username admin, tài khoản đã tồn tại; dùng tài khoản đó để đăng nhập, không khởi tạo lại database. Muốn tạo nhân viên, đổi username và NEW_ROLE thành Staff.
+CLI này tạo tài khoản đã duyệt cho người quản trị máy chủ; các nhân viên tự đăng ký trên web sẽ phải chờ quản lý duyệt. Chỉ tạo một lần. Nếu báo `ER_DUP_ENTRY` / `Duplicate entry` cho username admin, tài khoản đã tồn tại; dùng tài khoản đó để đăng nhập, không khởi tạo lại database. Muốn tạo nhân viên, đổi username và NEW_ROLE thành Staff.
+
+### Quản lý cấp tài khoản nhân viên trực tiếp
+
+1. Đăng nhập Quản lý → **Nhân viên & phê duyệt** → **Cấp tài khoản nhân viên**.
+2. Nhập họ tên, email, tên đăng nhập, mật khẩu ban đầu (12–256 ký tự) và xác nhận mật khẩu.
+3. Chọn các quyền nghiệp vụ rồi bấm **Tạo & cấp quyền**. Tài khoản luôn có vai trò Nhân viên, trạng thái Active và được sử dụng ngay; không cần xét duyệt lần nữa.
+4. Trang mặc định hiển thị **Tài khoản đã cấp**, gồm họ tên/username, email, phương thức đăng nhập, vai trò, trạng thái, quyền, ngày tạo/cập nhật quyền và ghi chú. Bấm số quyền để mở danh sách; chọn bộ lọc **Chờ duyệt** để xem đăng ký mới. Tài khoản xuất hiện trong bộ lọc **Đã cấp / Đang hoạt động**. Quản lý tự bàn giao tên đăng nhập/mật khẩu qua kênh riêng; hệ thống không tự gửi email và không lưu mật khẩu dạng rõ.
+
+Nếu tên đăng nhập/email đã tồn tại, hệ thống báo lỗi và không ghi đè tài khoản. Lịch sử cấp tài khoản ghi nhận quản lý thực hiện và quyền được cấp. Chức năng này dùng schema 002 hiện có, không cần migration mới.
+
+### Thử đăng ký và phê duyệt nhân viên
+
+Sau khi chạy BE/FE theo bước 7 hoặc 14:
+
+1. Tại trang đăng nhập, chọn **Đăng ký nhân viên**, nhập họ tên, email, username và mật khẩu ít nhất 12 ký tự. Tài khoản mới ở trạng thái **Chờ duyệt**, chưa đăng nhập được.
+2. Đăng nhập bằng tài khoản Quản lý đã tạo ở bước 6 → **Nhân viên & phê duyệt** → **Xét duyệt**.
+3. Chọn vai trò **Nhân viên**, trạng thái **Duyệt / Cho phép sử dụng**, đánh dấu các quyền cần cấp rồi **Lưu & cấp quyền**.
+4. Đăng xuất Quản lý và đăng nhập lại bằng tài khoản nhân viên. Nhân viên chỉ thấy chức năng được cấp; sao lưu/phục hồi và quản lý người dùng dành cho Quản lý.
+
+**Không bắt buộc cấu hình Google để chạy website:** đăng nhập bằng username/mật khẩu vẫn hoạt động. Muốn bật Google/Gmail, tự tạo OAuth client rồi điền `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI` và `FRONTEND_URL` trong `backend/.env`. Callback mặc định là `http://127.0.0.1:5173/api/auth/google/callback`, phải khai báo đúng trong Google Console. Xem [hướng dẫn Google OAuth](docs/auth-permissions.md#thiết-lập-google--gmail). Không đưa Client Secret vào FE hoặc Git. Tài khoản Google mới cũng phải chờ quản lý duyệt.
+
+### Bật đăng nhập Google / Gmail — tùy chọn
+
+Chỉ cần phần này nếu muốn dùng nút **Tiếp tục với Google / Gmail**. Người clone code vẫn chạy được bằng tài khoản mật khẩu khi để trống cấu hình Google; không dùng credential của máy tác giả.
+
+1. Vào [Google Auth Platform](https://console.cloud.google.com/auth/overview), tạo/chọn project. Hoàn tất **Get started / Những bước đầu tiên**, điền tên ứng dụng, email hỗ trợ/liên hệ và chọn **External / Bên ngoài** cho người dùng Gmail cá nhân. Trong **Audience / Khán giả**, thêm Gmail thử nghiệm vào Test users nếu ứng dụng ở chế độ Testing.
+2. Vào **Clients / Khách hàng → Create client / Tạo khách hàng**, chọn **Web application / Ứng dụng web**. Thêm Authorized redirect URI đúng từng ký tự: `http://127.0.0.1:5173/api/auth/google/callback`. Callback đi qua FE, không đổi thành cổng BE 5000/5002 khi dùng cấu hình Vite này.
+3. Sao chép Client ID đầy đủ (thường kết thúc bằng `.apps.googleusercontent.com`) và Client Secret. Google chỉ hiển thị/tải secret đầy đủ khi tạo: lưu ngay. Nếu đã tải JSON, lấy trường `client_id` và `client_secret`. Nếu chưa lưu secret, vào chi tiết client → **Client secrets → Add secret** nếu có; không dùng chuỗi bị che hoặc phần ID rút gọn có dấu `…`. Xem [quản lý OAuth client của Google](https://support.google.com/cloud/answer/15549257?hl=en).
+4. Thêm/sửa trong `backend/.env` (mỗi khóa chỉ một dòng), giữ nguyên MySQL/JWT:
+
+   ```dotenv
+   GOOGLE_CLIENT_ID=THAY_BANG_CLIENT_ID_THAT
+   GOOGLE_CLIENT_SECRET=THAY_BANG_CLIENT_SECRET_THAT
+   GOOGLE_REDIRECT_URI=http://127.0.0.1:5173/api/auth/google/callback
+   FRONTEND_URL=http://127.0.0.1:5173
+   ```
+
+   **Phải thay hai chữ mẫu đầu bằng giá trị Google cấp**, không dán nguyên ví dụ. Giữ CORS_ORIGINS có `http://127.0.0.1:5173`. Không đưa secret vào `frontend/.env`, biến VITE_*, Git hoặc ảnh/chát hỗ trợ.
+5. BE Node: dừng/chạy lại. BE Docker đã build mã mới: chạy từ thư mục gốc:
+
+   ```bash
+   docker compose -f docker/compose.backend.yml up -d --force-recreate backend
+   ```
+
+6. Khi FE/BE đang chạy, mở [trạng thái Google qua FE](http://127.0.0.1:5173/api/auth/providers). Mong đợi `{"google":{"enabled":true}}`. Kết quả này chỉ cho biết cấu hình đã bật, chưa chứng minh secret hợp lệ hoặc đăng nhập với Google thành công.
+7. Dùng Chrome/Safari thông thường, mở `http://127.0.0.1:5173`, tải lại trang, đăng xuất nếu cần rồi bấm Google. Tài khoản Google mới vẫn phải được quản lý duyệt; sau khi duyệt, đăng nhập Google lại.
+
+Nếu email đã có tài khoản mật khẩu (kể cả do Quản lý cấp), hệ thống chưa cho tự liên kết Google theo email: dùng mật khẩu đã có. Muốn thử luồng Google mới, dùng email chưa đăng ký trong website. Chi tiết bảo mật và cấu hình Gateway/production: [hướng dẫn Google](docs/auth-permissions.md#thiết-lập-google--gmail).
 
 ## 7. Cách A — Chạy BE bằng Node và FE bằng Vite
 
@@ -319,7 +385,7 @@ Sau lần thiết lập đầu tiên, chỉ cần:
 3. Bấm **Lưu đơn hàng** và chờ xác nhận từ MySQL.
 4. Mở **Quản lý đơn hàng**, thử tìm kiếm, lọc và xem chi tiết.
 5. Chuyển đơn từ Đang chờ sang Hoàn tất hoặc Đã hủy, kiểm tra lịch sử cập nhật.
-6. Mở **Tổng quan** để xem thống kê. Doanh thu chỉ cộng các đơn Hoàn tất.
+6. Mở **Thống kê** để xem tổng quan. Doanh thu chỉ cộng các đơn Hoàn tất.
 
 Đơn Hoàn tất/Đã hủy không chuyển ngược về Đang chờ. Nếu mất kết nối khi gửi đơn, dùng nút thử lại cùng yêu cầu đang chờ để tránh tạo trùng; không tự tạo yêu cầu mới khi kết quả chưa rõ.
 
@@ -408,6 +474,7 @@ Test dùng thông tin kết nối DB từ backend/.env hoặc biến môi trư�
 
 | Triệu chứng | Cách xử lý |
 |---|---|
+| npm ENOENT / không tìm thấy package.json | Terminal đang ở sai thư mục. Vào thư mục chứa package.json trước khi chạy npm: `cd omdrs` nếu clone theo bước 2; trên máy tác giả dùng `cd /Users/haanh/Desktop/WEb_QLDH/order-management-system` |
 | Docker không kết nối daemon | Mở Docker Desktop, chờ Engine running, kiểm tra lại docker version |
 | ERROR 1045 / Access denied | Kiểm tra đúng tài khoản/mật khẩu MySQL; mật khẩu trong cấu hình khởi tạo cũ có thể đã thay đổi. Không xóa volume để sửa lỗi |
 | ECONNREFUSED / readiness 503 | Kiểm tra container, cổng publish, DB_HOST/DB_PORT và schema; khởi động lại BE sau khi sửa .env |
@@ -415,6 +482,16 @@ Test dùng thông tin kết nối DB từ backend/.env hoặc biến môi trư�
 | Database có bảng, script từ chối | Nếu đã cài OMDRS thì bỏ qua db:init. Nếu dữ liệu không rõ nguồn thì dừng để kiểm tra, không xóa bảng |
 | Duplicate entry khi tạo admin | Tài khoản đã có; bỏ qua user:create và dùng mật khẩu website đã đặt |
 | Đăng nhập không đúng | Dùng mật khẩu website ở bước 6, không dùng mật khẩu root/MySQL |
+| Đăng nhập báo đang chờ duyệt | Quản lý phải vào Nhân viên & phê duyệt, duyệt và cấp quyền; người dùng mới đăng nhập lại sau khi được duyệt |
+| API báo 403 hoặc nhân viên không thấy chức năng | Kiểm tra quyền được quản lý cấp và trạng thái tài khoản; nhân viên không có quyền sao lưu/quản lý người dùng |
+| Nút Google/Gmail bị tắt | Chưa cấu hình OAuth hoặc origin/callback không khớp; xem docs/auth-permissions.md, vẫn có thể dùng username/mật khẩu |
+| Google báo redirect_uri_mismatch | Callback trong Google Console phải trùng GOOGLE_REDIRECT_URI, gồm host, cổng, đường dẫn; dùng nhất quán 127.0.0.1 hoặc localhost |
+| Google báo invalid_client / lỗi xác thực | Kiểm tra Client ID đầy đủ và Client Secret cùng một OAuth client; thay chữ mẫu bằng giá trị thật rồi nạp lại BE, không gửi secret cho người hỗ trợ |
+| Google báo access_denied / tài khoản không được phép | Kiểm tra Audience và Test users nếu app ở chế độ Testing; dùng Gmail đã được cho phép |
+| Google báo disallowed_useragent trong trình duyệt nhúng | Mở website bằng Chrome/Safari thông thường rồi thử lại |
+| Google báo email đã có tài khoản mật khẩu | Dùng mật khẩu của tài khoản đó; hiện chưa có chức năng liên kết Google vào tài khoản đã tồn tại |
+
+| db:migrate báo thiếu quyền ALTER/CREATE | Nhờ người quản trị chạy migration bằng tài khoản provisioning đúng schema; không xóa database hoặc cấp quyền toàn server cho tài khoản runtime |
 | API báo 401 | Đăng nhập lại; phiên có thời hạn 8 giờ. Dùng cùng địa chỉ FE nhất quán, không đổi qua lại localhost và 127.0.0.1 |
 | EADDRINUSE / port already in use | Kiểm tra Terminal đã chạy dịch vụ chưa; không mở thêm bản trùng. Trên macOS, cổng 5000 có thể bị Control Center/AirPlay sử dụng: xem hướng dẫn đổi cổng dưới bảng; không dừng tiến trình hệ thống |
 | unable to get image ... Cannot connect to the Docker daemon | Lỗi Engine chưa sẵn sàng, không đồng nghĩa thiếu image. Mở Docker Desktop, chờ Engine running rồi chạy lại docker compose up |
@@ -458,6 +535,7 @@ docs/         Tài liệu kỹ thuật và runbook
 |---|---|
 | npm ci | Cài toàn bộ dependency theo lockfile |
 | npm run db:init | Khởi tạo schema mới/rỗng, cần CONFIRM_EMPTY_DATABASE |
+| npm run db:migrate | Bổ sung schema 002 vào database cũ, có safety snapshot; cần quyền ALTER phù hợp |
 | npm run user:create | Tạo tài khoản website, cần NEW_USERNAME/NEW_PASSWORD/NEW_ROLE |
 | npm run dev -w backend | Chạy riêng BE, cổng 5000 |
 | npm run dev -w frontend | Chạy riêng FE, cổng 5173 |
@@ -567,22 +645,66 @@ Trên Windows có thể dùng `py scripts/package.py`. Script bỏ dependency, s
 
 ## 16. Cập nhật code ở máy đã cài
 
-Trong thư mục gốc repository:
+### 16.1. Pull code và cài lại dependency
+
+Vào thư mục gốc repository, kiểm tra thay đổi trước:
 
 ```bash
 git status
+```
+
+Nếu có thay đổi local, lưu hoặc commit trước; không dùng reset/xóa tệp để ép cập nhật. Sau đó:
+
+```bash
 git pull --ff-only
 npm ci
 ```
 
-Nếu có thay đổi local, lưu hoặc commit thay đổi trước; không dùng reset/xóa tệp để ép cập nhật. Sau khi cập nhật:
+Giữ nguyên các tệp `.env` riêng của máy và dữ liệu MySQL. Đối chiếu `.env.example` để bổ sung biến cấu hình mới nếu có; không chép đè secret đang dùng bằng mẫu.
 
-- Cách A: dừng và chạy lại BE/FE/Monitor tương ứng.
-- Cách B: chạy `docker compose -f docker/compose.backend.yml up -d --build`, rồi khởi động lại FE.
-- Giữ nguyên các tệp .env riêng của máy và dữ liệu MySQL. Đối chiếu .env.example để bổ sung biến cấu hình mới nếu có.
-- Không tự chạy lại db:init trên database đang có dữ liệu. Nếu bản cập nhật thay đổi schema, đọc hướng dẫn migration và sao lưu trước khi áp dụng; hiện dự án chỉ có schema/migration đầu tiên.
+### 16.2. Nâng cấp database bản cũ lên schema 002
+
+**Thực hiện trước khi chạy BE mới.** Nếu cài mới bằng schema hiện tại hoặc đã chạy migration thành công, bỏ qua bước này. Không chạy lại `db:init` trên database đang có dữ liệu.
+
+1. Giữ MySQL đang chạy. Dừng các BE đang dùng database này để tạm dừng ghi dữ liệu. BE Node: Control + C tại Terminal của BE. BE Docker theo cách B:
+
+   ```bash
+   docker compose -f docker/compose.backend.yml stop backend
+   ```
+
+   Nếu dùng cấu hình nhiều BE/backup theo lịch, dừng tất cả tiến trình ghi và job tương ứng trong thời gian nâng cấp.
+2. Kiểm tra `backend/.env`: lệnh migration chạy bằng Node **trên máy**, nên MySQL Docker trên cùng máy dùng `DB_HOST=127.0.0.1` và cổng publish thực tế, thường 3306. Compose sẽ tự ghi đè host khi BE chạy trong container.
+3. Tài khoản chạy migration cần SELECT/INSERT/CREATE/ALTER/INDEX/REFERENCES trên schema ứng dụng. Nếu tài khoản runtime chỉ có quyền đọc/ghi, nhờ người quản trị dùng credential provisioning tạm thời cho lệnh này; không đổi tài khoản runtime sang root. Xem [chi tiết migration](docs/auth-permissions.md#cập-nhật-database-đang-có-dữ-liệu).
+4. Từ thư mục gốc, chạy khi đã có đúng quyền:
+
+   ```bash
+   npm run db:migrate
+   ```
+
+   Runner lưu snapshot SQL + SHA-256 trong `database/backups/` trên máy trước khi sửa cấu trúc. Bảo vệ và sao chép bản này ra nơi lưu trữ riêng. Khi thành công sẽ có `Migration 002 hoàn tất...`; nếu đã nâng cấp sẽ có `Schema 002 đã được áp dụng.`. Nếu lỗi, xử lý quyền/kết nối trước khi tiếp tục; không xóa bảng hoặc volume.
+
+Tài khoản và đơn hàng cũ được giữ lại. Tài khoản cũ vẫn Active; nhân viên đăng ký mới phải chờ duyệt. Migration chỉ dùng cho máy đã có schema 001; máy mới thực hiện bước 5–6.
+
+### 16.3. Chạy lại ứng dụng sau cập nhật
+
+**Cách A — Node:** tại các Terminal riêng, chạy lại `npm run dev -w backend` và `npm run dev -w frontend`. Khởi động lại Monitoring nếu đang sử dụng. FE phải trỏ tới cổng BE Node thực tế.
+
+**Cách B — BE Docker:** build lại để image chứa code vừa pull, rồi chạy FE:
+
+```bash
+docker compose -f docker/compose.backend.yml up -d --build
+npm run dev -w frontend
+```
+
+Giữ Terminal FE mở và đảm bảo `frontend/.env` có `API_PROXY_TARGET=http://127.0.0.1:5002`. Chỉ chạy `docker compose restart` sẽ không đưa code mới trên máy vào image.
+
+Kiểm tra `/health/ready` trên cổng BE tương ứng (5000 cho Node mặc định, 5002 cho Docker), cần `status: Healthy` và `database: Healthy`. Mở http://127.0.0.1:5173, đăng nhập Quản lý để thử **Nhân viên & phê duyệt**. Google là tùy chọn; không có OAuth client vẫn chạy được bằng username/mật khẩu.
 
 ## 17. Phạm vi đã xác minh và tài liệu tham khảo
+
+Đợt cập nhật **30/10/2026**: **33/33 kiểm thử đạt**, gồm kiểm thử Quản lý cấp tài khoản Staff/Active dùng ngay, chặn cấp trái quyền, tên/email trùng và backup/restore trên MySQL cách ly. Build FE thành công; danh sách mặc định hiển thị tài khoản đã cấp và quyền tương ứng. Trên máy phát triển đã nạp cấu hình OAuth riêng, kiểm tra readiness HTTP 200 và `/api/auth/providers` trả `google.enabled=true`. **Chưa xác nhận đăng nhập Google thật hoàn tất**. Credential riêng không đi theo Git; người clone tự cấu hình. Không coi cờ enabled là bằng chứng OAuth thành công.
+
+Đợt cập nhật **29/10/2026**: **31/31 kiểm thử đạt**, gồm MySQL tích hợp và migration 001 → 002 trên container cách ly; build FE thành công, BE Docker kết nối database Healthy. Đã thử giao diện đăng ký → duyệt/cấp quyền → nhân viên đăng nhập và thêm sản phẩm bằng dữ liệu thử riêng. Chưa thử đăng nhập Google bằng OAuth client thật; cần cấu hình của người triển khai. Xem [báo cáo kiểm thử cập nhật](docs/testing-report.md).
 
 Đợt rà soát **27/10/2026**: sao chép các tệp source được Git theo dõi sang thư mục sạch, không mang theo .env thật, backup hoặc node_modules. `npm ci --offline` cài thành công từ cache npm; `npm run build` thành công; `npm test` có **16 đạt, 0 lỗi, 1 integration test được bỏ qua**. Cấu hình Compose BE qua kiểm tra cú pháp. Đây là kiểm tra khả năng cài từ lockfile với cache trên macOS, chưa phải thử đầy đủ tải dependency qua mạng hoặc khởi tạo MySQL mới trên mọi hệ điều hành.
 

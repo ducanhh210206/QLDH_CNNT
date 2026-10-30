@@ -4,7 +4,7 @@ import { join } from "node:path";
 import mysql from "mysql2/promise";
 import mysqlFormat from "mysql2";
 import { pool } from "../config/database.js";
-import { env, directDatabaseConfig } from "../config/env.js";
+import { env, directDatabaseConfig, databaseLockName } from "../config/env.js";
 import { digest, compareOrders } from "../utils/integrity.js";
 import { fail } from "../utils/errors.js";
 // Only application tables; auth sessions and idempotency keys stay part of consistent snapshot.
@@ -18,6 +18,9 @@ const tables = [
   "backup_records",
   "restore_records",
   "schema_migrations",
+  "user_access_history",
+  "oauth_login_attempts",
+  "products",
 ];
 let busy = false;
 export async function listBackups() {
@@ -37,7 +40,7 @@ export async function createBackup(userId = null) {
     await mkdir(env.backups, { recursive: true, mode: 0o700 });
     c = await pool.getConnection();
     const [lock] = await c.execute("SELECT GET_LOCK(?,0) AS acquired", [
-      "omdrs_backup_" + env.db.database,
+      databaseLockName(),
     ]);
     if (Number(lock[0].acquired) !== 1)
       fail(409, "BACKUP_BUSY", "Một instance khác đang sao lưu.");
@@ -116,9 +119,7 @@ export async function createBackup(userId = null) {
     if (c) {
       if (locked)
         await c
-          .execute("SELECT RELEASE_LOCK(?)", [
-            "omdrs_backup_" + env.db.database,
-          ])
+          .execute("SELECT RELEASE_LOCK(?)", [databaseLockName()])
           .catch(() => {});
       c.release();
     }

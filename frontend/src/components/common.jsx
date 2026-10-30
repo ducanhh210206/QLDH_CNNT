@@ -7,6 +7,12 @@ export function useData(path, interval = 0) {
     [loading, setLoading] = useState(true),
     [revision, setRevision] = useState(0);
   useEffect(() => {
+    if (!path) {
+      setData(null);
+      setError("");
+      setLoading(false);
+      return;
+    }
     let active = true;
     const controller = new AbortController();
     async function load() {
@@ -33,10 +39,10 @@ export function useData(path, interval = 0) {
   }, [path, revision, interval]);
   return { data, error, loading, reload: () => setRevision((n) => n + 1) };
 }
-export const Badge = ({ status }) => (
+export const Badge = ({ status, label }) => (
   <span className={"badge " + status?.replaceAll(" ", "-")}>
     <i />
-    {statusName(status)}
+    {label || statusName(status)}
   </span>
 );
 export const ErrorBox = ({ error, retry }) =>

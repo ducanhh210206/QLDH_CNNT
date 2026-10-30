@@ -29,7 +29,12 @@ export async function list(q) {
       ",id LIMIT ? OFFSET ?",
     [...args, q.limit, (q.page - 1) * q.limit],
   );
-  return { data: rows, total: n[0].total, page: q.page, limit: q.limit };
+  return {
+    data: rows,
+    total: Number(n[0].total),
+    page: q.page,
+    limit: q.limit,
+  };
 }
 export async function create(data, userId, key) {
   const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
@@ -124,11 +129,51 @@ export async function summary() {
   const [r] = await pool.query(
     "SELECT COUNT(*) total,COALESCE(SUM(status='Pending'),0) pending,COALESCE(SUM(status='Completed'),0) completed,COALESCE(SUM(status='Cancelled'),0) cancelled,COALESCE(SUM(CASE WHEN status='Completed' THEN total_amount ELSE 0 END),0) revenue FROM orders",
   );
-  return r[0];
+  return {
+    ...r[0],
+    ...Object.fromEntries(
+      ["total", "pending", "completed", "cancelled"].map((key) => [
+        key,
+        Number(r[0][key]),
+      ]),
+    ),
+  };
 }
 export async function statistics() {
   const [r] = await pool.query(
     "SELECT DATE(created_at) day,COUNT(*) count FROM orders WHERE created_at>=UTC_DATE()-INTERVAL 29 DAY GROUP BY DATE(created_at) ORDER BY day",
   );
-  return r;
+  return r.map((row) => ({ ...row, count: Number(row.count) }));
+}
+
+export async function transactions(q) {
+  const where = [],
+    args = [];
+  if (q.search) {
+    where.push(
+      "(o.id LIKE ? OR o.customer_name LIKE ? OR o.product_name LIKE ?)",
+    );
+    args.push(...Array(3).fill("%" + q.search + "%"));
+  }
+  if (q.status) {
+    where.push("h.new_status=?");
+    args.push(q.status);
+  }
+  const clause = where.length ? " WHERE " + where.join(" AND ") : "";
+  const base =
+    " FROM order_status_history h JOIN orders o ON o.id=h.order_id JOIN users u ON u.id=h.user_id";
+  const [n] = await pool.execute("SELECT COUNT(*) total" + base + clause, args);
+  const [rows] = await pool.query(
+    "SELECT h.id,h.order_id,h.old_status,h.new_status,h.created_at,u.username,o.customer_name,o.product_name,o.quantity,o.total_amount" +
+      base +
+      clause +
+      " ORDER BY h.created_at DESC,h.id DESC LIMIT ? OFFSET ?",
+    [...args, q.limit, (q.page - 1) * q.limit],
+  );
+  return {
+    data: rows,
+    total: Number(n[0].total),
+    page: q.page,
+    limit: q.limit,
+  };
 }

@@ -29,3 +29,7 @@ Cùng origin qua Vite/Nginx, JSON UTF-8. Login đặt cookie `omdrs` HttpOnly; c
 System/status trả các sự kiện Live từ tiến trình monitoring riêng; API incidents không nhập lại những sự kiện đó thành dữ liệu mô phỏng. Không có API thực thi lệnh shell. Không có API xóa dữ liệu hoặc promotion database.
 
 Backup/restore hiện chạy đồng bộ trong request. Giới hạn thiết kế cho đồ án/dữ liệu nhỏ; production cần worker bền vững, trạng thái job, cơ chế nhận lại kết quả khi timeout và phân trang nhật ký lâu dài. Request mất kết nối không chứng minh tác vụ đã dừng: xem backup list/restore record và log trước khi chạy lại.
+
+## Phân quyền và OAuth (schema 002)
+
+Xem [API, quyền chức năng, duyệt nhân viên và Google OAuth](auth-permissions.md). Admin được hiển thị là Quản lý, Staff là Nhân viên. API auth/me trả permissions/account_status; mọi API nghiệp vụ yêu cầu tài khoản Active và đúng quyền.

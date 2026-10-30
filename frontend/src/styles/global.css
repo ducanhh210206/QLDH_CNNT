@@ -1910,3 +1910,20 @@ fieldset {
     transition: none !important;
   }
 }
+
+/* Access approval, registration and product catalog */
+textarea{display:block;width:100%;margin-top:8px;resize:vertical;min-height:85px;border:1px solid var(--line);border-radius:7px;padding:11px 13px;font:inherit;font-size:12px;color:var(--text);background:var(--input)}
+textarea:focus{outline:2px solid #087e7233;border-color:var(--teal)}
+.success-notice{display:flex;gap:10px;align-items:flex-start;background:var(--soft);border:1px solid var(--line);border-radius:7px;padding:15px;color:var(--teal);font-size:11px;margin:20px 0}.success-notice svg{flex-shrink:0}
+.auth-divider{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:10px;margin:20px 0}.auth-divider:before,.auth-divider:after{content:'';height:1px;background:var(--line);flex:1}
+.google-button{justify-content:center;gap:12px}.google-letter{font-size:18px;font-weight:700;color:#4285f4}.auth-hint{text-align:center;font-size:9px;color:var(--muted);margin-top:9px!important;margin-bottom:0!important}.auth-switch{text-align:center;margin-top:23px;font-size:10px;color:var(--muted)}
+.permission-grid{border:1px solid var(--line);border-radius:8px;padding:18px;margin-bottom:20px;display:grid;grid-template-columns:1fr 1fr;gap:15px}.permission-grid legend{padding:0 8px;font-size:11px;color:var(--muted)}.permission-grid .checkbox-label{margin:0;font-size:11px}.permission-grid input{flex-shrink:0}.permission-tag{display:inline-flex;margin:5px}
+.review-identity{display:flex;align-items:center;gap:15px;padding:5px 0 25px}.review-identity .avatar{width:45px;height:45px;background:var(--soft)}.review-identity p,.review-identity small{font-size:10px;color:var(--muted);margin-top:4px}.badge.Active{background:#eaf5ed;color:#4f8963}.badge.Rejected,.badge.Suspended{background:#f9eeeb;color:#ad7569}
+.single-column{max-width:100%}.sidebar nav{overflow-y:auto;min-height:0;flex-shrink:1}.sidebar-bottom{flex-shrink:0}.sidebar nav button{flex-shrink:0}.brand-version{letter-spacing:.3px}.login-form-wrap{overflow:auto}.login-form label{margin-bottom:16px}
+@media(max-width:600px){.permission-grid{grid-template-columns:1fr}.review-identity{align-items:flex-start}.login-form{padding-top:25px;padding-bottom:25px}}
+
+.account-permissions { min-width: 180px; max-width: 260px; white-space: normal; }
+.account-permissions summary { cursor: pointer; color: var(--teal); }
+.account-permissions ul { margin: 8px 0 0; padding-left: 18px; line-height: 1.8; }
+.account-note { min-width: 140px; max-width: 240px; white-space: normal; overflow-wrap: anywhere; }
+.account-metadata { padding: 0 0 20px; color: var(--muted); font-size: 11px; line-height: 1.8; overflow-wrap: anywhere; }

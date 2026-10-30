@@ -65,7 +65,16 @@ test("authenticated Staff is denied infrastructure operations", async (t) => {
     env.jwt = old;
   });
   t.mock.method(pool, "execute", async () => [
-    [{ id: "test-staff", username: "staff", role: "Staff" }],
+    [
+      {
+        id: "test-staff",
+        username: "staff",
+        role: "Staff",
+        account_status: "Active",
+        permissions: null,
+        access_version: 1,
+      },
+    ],
   ]);
   const token = jwt.sign({ sub: "test-staff", sid: "session" }, env.jwt, {
     issuer: "omdrs",
@@ -86,7 +95,18 @@ test("authenticated order query fails with structured 503 instead of fake data",
   });
   t.mock.method(pool, "execute", async (sql) => {
     if (sql.includes("auth_sessions"))
-      return [[{ id: "test-staff", username: "staff", role: "Staff" }]];
+      return [
+        [
+          {
+            id: "test-staff",
+            username: "staff",
+            role: "Staff",
+            account_status: "Active",
+            permissions: null,
+            access_version: 1,
+          },
+        ],
+      ];
     throw Object.assign(new Error(), { code: "ECONNREFUSED" });
   });
   const token = jwt.sign({ sub: "test-staff", sid: "session" }, env.jwt, {

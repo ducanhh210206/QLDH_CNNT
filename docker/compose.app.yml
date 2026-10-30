@@ -6,7 +6,9 @@ x-api: &api
   env_file: ${OMDRS_ENV_FILE:-../.env}
   environment: &env
     HOST: 0.0.0.0
-    NODE_ENV: production
+    # Local HTTP lab, gateway published on loopback only.
+    # Public deployments require HTTPS and NODE_ENV=production.
+    NODE_ENV: development
     DB_HOST: ${DB_HOST:-host.docker.internal}
     MONITOR_URL: http://monitoring:5001
   volumes:

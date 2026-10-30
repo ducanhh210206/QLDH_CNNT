@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Save, ShieldCheck, ArrowLeft, Info } from "lucide-react";
 import { api, money } from "../services/api";
-import { PageHeading, Panel, ErrorBox } from "../components/common";
+import { PageHeading, Panel, ErrorBox, useData } from "../components/common";
 const blank = {
   customer_name: "",
   product_name: "",
@@ -9,17 +9,23 @@ const blank = {
   total_amount: "",
   status: "Pending",
 };
-export default function CreateOrder({ notify, navigate }) {
+import { can } from "../utils/permissions";
+export default function CreateOrder({ notify, navigate, user }) {
+  const draftKey = "omdrs-draft:" + user.id,
+    pendingKey = "omdrs-pending:" + user.id;
+  const products = useData(
+    can(user, "products.read") ? "/api/products?limit=100" : null,
+  );
   const [form, setForm] = useState(() => {
       try {
-        return JSON.parse(localStorage.getItem("omdrs-draft")) || blank;
+        return JSON.parse(localStorage.getItem(draftKey)) || blank;
       } catch {
         return blank;
       }
     }),
     [pending, setPending] = useState(() => {
       try {
-        return JSON.parse(localStorage.getItem("omdrs-pending"));
+        return JSON.parse(localStorage.getItem(pendingKey));
       } catch {
         return null;
       }
@@ -29,7 +35,7 @@ export default function CreateOrder({ notify, navigate }) {
   function change(e) {
     const next = { ...form, [e.target.name]: e.target.value };
     setForm(next);
-    localStorage.setItem("omdrs-draft", JSON.stringify(next));
+    localStorage.setItem(draftKey, JSON.stringify(next));
   }
   async function submit(e) {
     e.preventDefault();
@@ -49,7 +55,7 @@ export default function CreateOrder({ notify, navigate }) {
     }
     const submission = pending || { body, key: crypto.randomUUID() };
     setPending(submission);
-    localStorage.setItem("omdrs-pending", JSON.stringify(submission));
+    localStorage.setItem(pendingKey, JSON.stringify(submission));
     setBusy(true);
     setError("");
     try {
@@ -58,8 +64,8 @@ export default function CreateOrder({ notify, navigate }) {
         headers: { "Idempotency-Key": submission.key },
         body: JSON.stringify(submission.body),
       });
-      localStorage.removeItem("omdrs-pending");
-      localStorage.removeItem("omdrs-draft");
+      localStorage.removeItem(pendingKey);
+      localStorage.removeItem(draftKey);
       setPending(null);
       setForm(blank);
       notify(
@@ -69,7 +75,7 @@ export default function CreateOrder({ notify, navigate }) {
     } catch (e) {
       setError(e.message);
       if (!e.uncertain) {
-        localStorage.removeItem("omdrs-pending");
+        localStorage.removeItem(pendingKey);
         setPending(null);
       }
     } finally {
@@ -108,6 +114,36 @@ export default function CreateOrder({ notify, navigate }) {
                   placeholder="Ví dụ: Nguyễn Minh Anh"
                 />
               </label>
+              {products.data?.data.length > 0 && (
+                <label>
+                  Chọn nhanh từ danh mục
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const item = products.data.data.find(
+                        (p) => p.id === e.target.value,
+                      );
+                      if (!item) return;
+                      const next = {
+                        ...form,
+                        product_name: item.name,
+                        total_amount: (
+                          Number(item.unit_price) * Number(form.quantity || 1)
+                        ).toFixed(2),
+                      };
+                      setForm(next);
+                      localStorage.setItem(draftKey, JSON.stringify(next));
+                    }}
+                  >
+                    <option value="">Chọn sản phẩm (tùy chọn)</option>
+                    {products.data.data.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.sku} · {p.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <label>
                 Tên sản phẩm *
                 <input
@@ -152,8 +188,12 @@ export default function CreateOrder({ notify, navigate }) {
                 Trạng thái ban đầu
                 <select name="status" value={form.status} onChange={change}>
                   <option value="Pending">Đang chờ</option>
-                  <option value="Completed">Hoàn tất</option>
-                  <option value="Cancelled">Đã hủy</option>
+                  {can(user, "orders.update") && (
+                    <>
+                      <option value="Completed">Hoàn tất</option>
+                      <option value="Cancelled">Đã hủy</option>
+                    </>
+                  )}
                 </select>
               </label>
             </fieldset>

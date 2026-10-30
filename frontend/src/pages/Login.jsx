@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ArrowUpRight,
   ShieldCheck,
@@ -6,30 +6,81 @@ import {
   Activity,
   Database,
   ArrowRight,
+  Clock3,
 } from "lucide-react";
 import { api } from "../services/api";
-import { ErrorBox, Badge, useData } from "../components/common";
+import { ErrorBox, useData } from "../components/common";
+const resultMessages = {
+  pending:
+    "Tài khoản đã được ghi nhận. Vui lòng chờ quản lý duyệt và cấp quyền trước khi đăng nhập.",
+  disabled:
+    "Tài khoản đang bị từ chối hoặc tạm khóa. Vui lòng liên hệ quản lý.",
+  link_required:
+    "Email này đã có tài khoản mật khẩu. Hãy đăng nhập bằng mật khẩu đã đăng ký.",
+  cancelled: "Bạn đã hủy đăng nhập Google.",
+  not_configured: "Đăng nhập Google chưa được quản lý cấu hình.",
+  google_failed: "Không xác minh được đăng nhập Google. Vui lòng thử lại.",
+};
 export default function Login({ onLogin }) {
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState("");
-  const health = useData("/health/ready", 15000);
+  const [mode, setMode] = useState("login"),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [message, setMessage] = useState(
+      () =>
+        resultMessages[
+          new URLSearchParams(window.location.search).get("auth_result")
+        ] || "",
+    );
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.has("auth_result")) {
+      url.searchParams.delete("auth_result");
+      window.history.replaceState(
+        null,
+        "",
+        url.pathname + url.search + url.hash,
+      );
+    }
+  }, []);
+  const health = useData("/health/ready", 15000),
+    providers = useData("/api/auth/providers");
   async function submit(e) {
     e.preventDefault();
-    setBusy(true);
     setError("");
-    const form = new FormData(e.currentTarget);
+    setMessage("");
+    const data = Object.fromEntries(new FormData(e.currentTarget));
+    if (mode === "register" && data.password !== data.confirm_password) {
+      setError("Mật khẩu xác nhận chưa trùng khớp.");
+      return;
+    }
+    delete data.confirm_password;
+    setBusy(true);
     try {
-      onLogin(
-        await api("/api/auth/login", {
+      if (mode === "register") {
+        const r = await api("/api/auth/register", {
           method: "POST",
-          body: JSON.stringify(Object.fromEntries(form)),
-        }),
-      );
+          body: JSON.stringify(data),
+        });
+        setMessage(r.message);
+        setMode("pending");
+      } else {
+        onLogin(
+          await api("/api/auth/login", {
+            method: "POST",
+            body: JSON.stringify(data),
+          }),
+        );
+      }
     } catch (e) {
       setError(e.message);
     } finally {
       setBusy(false);
     }
+  }
+  function switchMode(next) {
+    setMode(next);
+    setError("");
+    setMessage("");
   }
   return (
     <div className="login-page">
@@ -53,27 +104,27 @@ export default function Login({ onLogin }) {
           <em>vẹn toàn.</em>
         </h1>
         <p>
-          Quản lý vận hành tập trung. Giám sát liên tục.
+          Cùng một không gian làm việc.
           <br />
-          Sẵn sàng cho những điều không mong đợi.
+          Đúng người, đúng quyền, dữ liệu an toàn.
         </p>
         <div className="system-graphic">
           <div>
             <Database />
-            <span>MYSQL PRIMARY</span>
-            <small>Lưu trữ bền vững</small>
+            <span>QUẢN LÝ ĐƠN</span>
+            <small>Giao dịch rõ ràng</small>
           </div>
           <span className="graphic-line" />
           <div>
             <ShieldCheck />
-            <span>RECOVERY</span>
-            <small>Kiểm chứng dữ liệu</small>
+            <span>PHÂN QUYỀN</span>
+            <small>Quản lý phê duyệt</small>
           </div>
           <span className="graphic-line" />
           <div>
             <Activity />
-            <span>MONITORING</span>
-            <small>Giám sát độc lập</small>
+            <span>SAO LƯU</span>
+            <small>Dữ liệu vẹn toàn</small>
           </div>
         </div>
         <footer>
@@ -83,61 +134,181 @@ export default function Login({ onLogin }) {
       </div>
       <div className="login-form-wrap">
         <div className="login-top">
-          HỆ THỐNG QUẢN TRỊ <span>v1.0</span>
+          KHÔNG GIAN LÀM VIỆC <span>OMDRS</span>
         </div>
-        <form className="login-form" onSubmit={submit}>
+        <form className="login-form" onSubmit={submit} key={mode}>
           <div className="login-shield">
-            <ShieldCheck size={25} />
+            {mode === "pending" ? (
+              <Clock3 size={25} />
+            ) : (
+              <ShieldCheck size={25} />
+            )}
           </div>
-          <div className="eyebrow">CHÀO MỪNG TRỞ LẠI</div>
-          <h2>Đăng nhập workspace</h2>
-          <p>Tiếp tục quản lý đơn hàng và theo dõi hệ thống.</p>
+          <div className="eyebrow">
+            {mode === "register"
+              ? "THAM GIA ĐỘI NGŨ"
+              : mode === "pending"
+                ? "CHỜ QUẢN LÝ PHÊ DUYỆT"
+                : "CHÀO MỪNG TRỞ LẠI"}
+          </div>
+          <h2>
+            {mode === "register"
+              ? "Đăng ký nhân viên"
+              : mode === "pending"
+                ? "Đã gửi yêu cầu"
+                : "Đăng nhập workspace"}
+          </h2>
+          <p>
+            {mode === "register"
+              ? "Tài khoản mới cần được quản lý duyệt và cấp quyền."
+              : mode === "pending"
+                ? "Bạn có thể đăng nhập sau khi được cấp quyền."
+                : "Quản lý đơn hàng và làm việc theo quyền được cấp."}
+          </p>
           <ErrorBox error={error} />
-          <label>
-            Tên đăng nhập
-            <input
-              name="username"
-              required
-              autoComplete="username"
-              placeholder="Tên tài khoản của bạn"
-              maxLength={100}
-            />
-          </label>
-          <label>
-            Mật khẩu
-            <input
-              name="password"
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="Nhập mật khẩu"
-              maxLength={256}
-            />
-          </label>
-          <button className="button primary wide" disabled={busy}>
-            {busy ? "Đang xác thực…" : "Đăng nhập"}
-            <ArrowRight size={18} />
-          </button>
+          {message && (
+            <div className="success-notice" role="status">
+              <Clock3 size={18} />
+              <span>{message}</span>
+            </div>
+          )}
+          {mode !== "pending" && (
+            <>
+              {mode === "register" && (
+                <>
+                  <label>
+                    Họ và tên
+                    <input
+                      name="full_name"
+                      required
+                      maxLength={120}
+                      autoComplete="name"
+                      placeholder="Nguyễn Minh Anh"
+                    />
+                  </label>
+                  <label>
+                    Email
+                    <input
+                      name="email"
+                      type="email"
+                      required
+                      maxLength={254}
+                      autoComplete="email"
+                      placeholder="ban@gmail.com"
+                    />
+                  </label>
+                </>
+              )}
+              <label>
+                {mode === "register"
+                  ? "Tên đăng nhập"
+                  : "Tên đăng nhập hoặc email"}
+                <input
+                  name="username"
+                  required
+                  autoComplete="username"
+                  minLength={mode === "register" ? 3 : 1}
+                  maxLength={mode === "register" ? 100 : 254}
+                  pattern={
+                    mode === "register" ? "[A-Za-z0-9._\-]{3,100}" : undefined
+                  }
+                  placeholder={
+                    mode === "register"
+                      ? "Chữ, số, dấu chấm, gạch dưới"
+                      : "Tên tài khoản hoặc email của bạn"
+                  }
+                />
+              </label>
+              <label>
+                Mật khẩu
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  minLength={mode === "register" ? 12 : 1}
+                  maxLength={256}
+                  autoComplete={
+                    mode === "register" ? "new-password" : "current-password"
+                  }
+                  placeholder={
+                    mode === "register" ? "Tối thiểu 12 ký tự" : "Nhập mật khẩu"
+                  }
+                />
+              </label>
+              {mode === "register" && (
+                <label>
+                  Nhập lại mật khẩu
+                  <input
+                    name="confirm_password"
+                    type="password"
+                    required
+                    minLength={12}
+                    maxLength={256}
+                    autoComplete="new-password"
+                  />
+                </label>
+              )}
+              <button className="button primary wide" disabled={busy}>
+                {busy
+                  ? "Đang xử lý…"
+                  : mode === "register"
+                    ? "Gửi yêu cầu đăng ký"
+                    : "Đăng nhập"}
+                <ArrowRight size={18} />
+              </button>
+              <div className="auth-divider">
+                <span>hoặc</span>
+              </div>
+              <button
+                type="button"
+                className="button secondary wide google-button"
+                disabled={busy || !providers.data?.google?.enabled}
+                onClick={() =>
+                  window.location.assign(
+                    (import.meta.env.VITE_API_BASE || "") + "/api/auth/google",
+                  )
+                }
+              >
+                <span className="google-letter">G</span>Tiếp tục với Google /
+                Gmail
+              </button>
+              {!providers.loading && !providers.data?.google?.enabled && (
+                <p className="auth-hint">
+                  Đăng nhập Google chưa được quản lý cấu hình.
+                </p>
+              )}
+            </>
+          )}
+          <div className="auth-switch">
+            {mode === "login" ? (
+              <>
+                Chưa có tài khoản?{" "}
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => switchMode("register")}
+                >
+                  Đăng ký nhân viên
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => switchMode("login")}
+              >
+                Quay lại đăng nhập
+              </button>
+            )}
+          </div>
           <div className="login-status">
             <span className={"pulse " + (health.data ? "" : "offline")} />
-            {health.data
-              ? "Backend và MySQL sẵn sàng"
-              : "Chưa xác nhận kết nối MySQL"}
-            <span className="local-tag">LOCAL</span>
+            {health.data ? "Hệ thống sẵn sàng" : "Hệ thống chưa sẵn sàng"}
+            <span className="local-tag">BẢO MẬT</span>
           </div>
-          <details className="setup-help">
-            <summary>Thiết lập lần đầu</summary>
-            <p>
-              Cấu hình backend/.env, khởi tạo schema trên database rỗng rồi tạo
-              tài khoản bằng hướng dẫn trong README. Không có tài khoản hoặc mật
-              khẩu mặc định.
-            </p>
-            <p>Docker Engine cần hoạt động trước khi kết nối MySQL.</p>
-          </details>
         </form>
         <footer>
-          <ShieldCheck size={14} /> Phiên đăng nhập được bảo vệ · Phân quyền tại
-          máy chủ
+          <ShieldCheck size={14} /> Quyền truy cập được quản lý phê duyệt
         </footer>
       </div>
     </div>

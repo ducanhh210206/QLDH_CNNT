@@ -4,7 +4,7 @@ export async function readiness() {
   const start = performance.now();
   try {
     const [schema] = await pool.query(
-      "SELECT version FROM schema_migrations WHERE version='001_initial'",
+      "SELECT version FROM schema_migrations WHERE version='002_user_access'",
     );
     if (!schema.length) throw Error("SCHEMA_NOT_READY");
     if (env.jwt.length < 32)

@@ -8,7 +8,7 @@ RUN npm ci --omit=dev --workspace=backend --workspace=monitoring
 COPY backend backend
 COPY monitoring monitoring
 COPY database database
-RUN mkdir -p /app/database/backups && chown -R node:node /app
+RUN mkdir -p /app/database/backups /app/monitoring/data && chown -R node:node /app
 USER node
 WORKDIR /app/backend
 ENV HOST=0.0.0.0 NODE_ENV=production

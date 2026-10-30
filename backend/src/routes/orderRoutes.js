@@ -1,8 +1,9 @@
 import { Router } from "express";
 import * as c from "../controllers/orderController.js";
+import { permission } from "../middlewares/authMiddleware.js";
 export const orderRoutes = Router();
-orderRoutes.get("/", c.list);
-orderRoutes.post("/", c.create);
-orderRoutes.get("/:id", c.get);
-orderRoutes.patch("/:id/status", c.update);
-orderRoutes.get("/:id/history", c.history);
+orderRoutes.get("/", permission("orders.read"), c.list);
+orderRoutes.post("/", permission("orders.create"), c.create);
+orderRoutes.get("/:id", permission("orders.read"), c.get);
+orderRoutes.patch("/:id/status", permission("orders.update"), c.update);
+orderRoutes.get("/:id/history", permission("transactions.read"), c.history);
