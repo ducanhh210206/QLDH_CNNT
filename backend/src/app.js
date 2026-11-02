@@ -20,8 +20,10 @@ import { userRoutes } from "./routes/userRoutes.js";
 import { productRoutes } from "./routes/productRoutes.js";
 import { transactions } from "./repositories/orderRepository.js";
 import { listParams } from "./middlewares/validateOrder.js";
+import { mountFrontend } from "./utils/serveFrontend.js";
 export const app = express();
 app.disable("x-powered-by");
+if (env.trustProxy) app.set("trust proxy", env.trustProxy);
 app.use(helmet());
 app.use((req, res, next) => {
   req.requestId = randomUUID();
@@ -96,6 +98,7 @@ app.get(
 );
 app.use("/api/admin/users", requireAuth, admin, userRoutes);
 app.use("/api/admin", requireAuth, admin, adminRoutes);
+if (env.serveFrontend) mountFrontend(app, env.frontendDir);
 app.use((req, res) =>
   res
     .status(404)

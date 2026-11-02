@@ -2,15 +2,26 @@ import { createHash } from "node:crypto";
 import dotenv from "dotenv";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { databaseTls } from "./databaseTls.js";
 dotenv.config({
   path: fileURLToPath(new URL("../../.env", import.meta.url)),
   quiet: true,
 });
+const publicUrl =
+  process.env.FRONTEND_URL ||
+  process.env.RENDER_EXTERNAL_URL ||
+  "http://127.0.0.1:5173";
 export const env = {
   port: Number(process.env.PORT || 5000),
   host: process.env.HOST || "127.0.0.1",
   production: process.env.NODE_ENV === "production",
+  serveFrontend: process.env.SERVE_FRONTEND === "true",
+  frontendDir:
+    process.env.FRONTEND_DIST ||
+    fileURLToPath(new URL("../../../frontend/dist", import.meta.url)),
+  trustProxy: process.env.TRUST_PROXY_HOPS === "1" ? 1 : false,
   db: {
+    ...databaseTls(),
     host: process.env.DB_HOST || "127.0.0.1",
     port: Number(process.env.DB_PORT || 3306),
     database: process.env.DB_NAME || "order_management",
@@ -28,16 +39,21 @@ export const env = {
   },
   jwt: process.env.JWT_SECRET || "",
   origins: (
-    process.env.CORS_ORIGINS || "http://localhost:5173,http://127.0.0.1:5173"
-  ).split(","),
+    process.env.CORS_ORIGINS ||
+    (process.env.RENDER_EXTERNAL_URL
+      ? publicUrl
+      : "http://localhost:5173,http://127.0.0.1:5173")
+  )
+    .split(",")
+    .map((origin) => origin.trim()),
   instance: process.env.INSTANCE_NAME || "primary",
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
     redirectUri:
       process.env.GOOGLE_REDIRECT_URI ||
-      "http://127.0.0.1:5173/api/auth/google/callback",
-    frontendUrl: process.env.FRONTEND_URL || "http://127.0.0.1:5173",
+      new URL("/api/auth/google/callback", publicUrl).href,
+    frontendUrl: publicUrl,
   },
   monitor: process.env.MONITOR_URL || "http://127.0.0.1:5001",
   monitorToken: process.env.MONITOR_TOKEN || "",

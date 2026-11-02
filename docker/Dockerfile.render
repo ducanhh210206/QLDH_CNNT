@@ -1,0 +1,28 @@
+FROM node:24-alpine AS frontend-build
+WORKDIR /app
+COPY package*.json ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+COPY monitoring/package.json monitoring/package.json
+RUN npm ci --workspace=frontend
+COPY frontend frontend
+ENV VITE_API_BASE=""
+RUN npm run build -w frontend
+
+FROM node:24-alpine
+WORKDIR /app
+COPY package*.json ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+COPY monitoring/package.json monitoring/package.json
+RUN npm ci --omit=dev --workspace=backend
+COPY backend backend
+COPY database database
+COPY --from=frontend-build /app/frontend/dist /app/public
+RUN mkdir -p /app/database/backups && chown -R node:node /app
+ENV NODE_ENV=production HOST=0.0.0.0 PORT=10000 SERVE_FRONTEND=true FRONTEND_DIST=/app/public TRUST_PROXY_HOPS=1
+USER node
+WORKDIR /app/backend
+EXPOSE 10000
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||10000)+'/health/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "src/server.js"]

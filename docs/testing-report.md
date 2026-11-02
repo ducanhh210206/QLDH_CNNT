@@ -1,5 +1,12 @@
 # Báo cáo kiểm thử và nghiệm thu
 
+## Cập nhật ngày 02/11/2026 — chuẩn bị hosting demo
+
+- `npm test`: **34 PASS, 0 FAIL, 2 SKIP** (MySQL integration/migration opt-in không chạy trong lần này). Test HTTP cần quyền mở cổng localhost; sandbox ban đầu chặn, chạy lại có quyền đạt.
+- Kiểm thử mới: static React và SPA cùng origin, không nuốt API/health/private paths; TLS kiểm tra certificate/hostname và đọc CA; cấu hình URL/CORS/callback theo RENDER_EXTERNAL_URL.
+- Build image `omdrs-render-demo:local` bằng `docker/Dockerfile.render` thành công, bao gồm build FE và cài dependency runtime. Smoke container tạm riêng: `/` và providers HTTP 200; API lạ 404; API đơn hàng chưa đăng nhập 401; `.env` 404; không có backend/.env hoặc frontend/.env trong image. Container thử đã dừng.
+- Đã kết nối TLS thật đến Aiven bằng CA và kiểm tra hostname, xác nhận schema cloud rỗng trước khi khởi tạo; scripts/init-db.js áp dụng schema 001/002 thành công. Không ghi credential vào source. Chưa tạo Web Service Render, chưa chạy Google OAuth với URL cloud và chưa chuyển dữ liệu local; chưa phải nghiệm thu toàn bộ deployment cloud.
+
 ## Cập nhật ngày 30/10/2026 — quản lý cấp tài khoản
 
 - **33/33 kiểm thử đạt**, không bỏ qua, gồm MySQL và migration trên container riêng. Tài khoản do Quản lý tạo là Staff/Active, đăng nhập ngay bằng mật khẩu và chỉ dùng các quyền đã chọn.

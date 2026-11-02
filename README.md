@@ -6,6 +6,10 @@ Chức năng chính: đăng nhập Nhân viên/Quản lý, tự đăng ký nhân
 
 > Hướng dẫn này dành cho người tải mã nguồn về máy mới. Repository không chứa tài khoản, mật khẩu, database hay dữ liệu trên máy tác giả. Người chạy phải tự cấu hình môi trường và tạo tài khoản website.
 
+## Demo trên hosting, không phụ thuộc máy cá nhân
+
+Xem [hướng dẫn Render Free + Aiven MySQL Free](docs/deploy-render-aiven.md). Bản này gộp FE/BE trên một URL HTTPS, dùng MySQL cloud có TLS. Cần tự tạo tài khoản nhà cung cấp, khởi tạo database và nhập secret riêng; không dùng Compose localhost để public trực tiếp. Gói Free có giới hạn ngủ dịch vụ và không lưu file backup bền trên Render.
+
 ## Bắt đầu từ đâu?
 
 | Trường hợp | Các bước cần làm |

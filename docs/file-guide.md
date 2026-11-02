@@ -230,3 +230,14 @@ Khi BE chạy Docker, backup runtime nằm trong named volume gắn tại /app/d
 | Sửa cấu trúc bảng | schema.sql/migrations; database đã có dữ liệu cần migration được kiểm tra, không chỉ sửa file SQL rồi chạy lại init |
 | Theo dõi sự cố thật | healthService.js, monitoring/src/server.js, SystemMonitoring.jsx |
 | Sửa backup/restore | BackupRestore.jsx → backupController.js → backupService.js → integrity.js |
+
+## File hỗ trợ hosting demo (02/11/2026)
+
+| File | Công dụng |
+|---|---|
+| [docker/Dockerfile.render](../docker/Dockerfile.render) | Build FE và chạy chung với BE trên một dịch vụ Render, khác Compose nhiều backend. |
+| [backend/src/utils/serveFrontend.js](../backend/src/utils/serveFrontend.js) | Phục vụ bản build React và SPA fallback, giữ API/health/private paths riêng. |
+| [backend/src/config/databaseTls.js](../backend/src/config/databaseTls.js) | TLS MySQL: đọc CA, xác minh chứng chỉ và hostname. |
+| [backend/tests/hosting.test.js](../backend/tests/hosting.test.js) | Kiểm tra frontend cùng origin, ranh giới API và thiết lập cloud/TLS. |
+| [deploy/hosting.env.example](../deploy/hosting.env.example) | Mẫu cấu hình riêng để khởi tạo DB cloud từ máy cá nhân, không chứa credential thật. |
+| [docs/deploy-render-aiven.md](deploy-render-aiven.md) | Hướng dẫn tạo MySQL Aiven, Web Service Render, Google callback và giới hạn Free. |
