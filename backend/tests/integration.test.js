@@ -2,7 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import mysql from "mysql2/promise";
 import request from "supertest";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { digest } from "../src/utils/integrity.js";
 import { randomUUID } from "node:crypto";
 // Opt-in database test, ALWAYS creates a new test schema. No DROP, DELETE or TRUNCATE.
 test(
@@ -143,25 +145,21 @@ test(
       const issuedAgent = request.agent(app);
       assert.equal(
         (
-          await issuedAgent
-            .post("/api/auth/login")
-            .send({
-              username: issueBody.username,
-              password: issueBody.password,
-            })
+          await issuedAgent.post("/api/auth/login").send({
+            username: issueBody.username,
+            password: issueBody.password,
+          })
         ).status,
         200,
       );
       assert.equal((await issuedAgent.get("/api/products")).status, 200);
       assert.equal(
         (
-          await issuedAgent
-            .post("/api/admin/users")
-            .send({
-              ...issueBody,
-              username: "forbidden_staff",
-              email: "forbidden@example.com",
-            })
+          await issuedAgent.post("/api/admin/users").send({
+            ...issueBody,
+            username: "forbidden_staff",
+            email: "forbidden@example.com",
+          })
         ).status,
         403,
       );
@@ -179,6 +177,69 @@ test(
         [issued.body.id],
       );
       assert.equal(Number(auditCount.total), 1);
+      const adminNotices = await adminAgent.get("/api/notifications?limit=100");
+      assert.equal(adminNotices.status, 200, JSON.stringify(adminNotices.body));
+      assert.ok(adminNotices.body.data.some((item) => item.type === "order"));
+      assert.ok(adminNotices.body.data.some((item) => item.type === "account"));
+      const staffNotices = await issuedAgent.get(
+        "/api/notifications?limit=100",
+      );
+      assert.equal(staffNotices.status, 200);
+      assert.ok(staffNotices.body.data.length > 0);
+      assert.ok(
+        staffNotices.body.data.every(
+          (item) => item.type === "access" && item.page === "settings",
+        ),
+      );
+      const ownNotice = staffNotices.body.data[0];
+      const orderNotice = adminNotices.body.data.find(
+        (item) => item.type === "order",
+      );
+      assert.equal(
+        (
+          await issuedAgent
+            .post("/api/notifications/" + orderNotice.id + "/read")
+            .send({})
+        ).status,
+        404,
+      );
+      assert.equal(
+        (
+          await issuedAgent
+            .post("/api/notifications/" + ownNotice.id + "/read")
+            .send({})
+        ).status,
+        204,
+      );
+      assert.equal(
+        (
+          await issuedAgent
+            .post("/api/notifications/" + ownNotice.id + "/read")
+            .send({})
+        ).status,
+        204,
+      );
+      assert.equal(
+        (await issuedAgent.get("/api/notifications")).body.unread_count,
+        0,
+      );
+      const managerOwnCopy = (
+        await adminAgent.get("/api/notifications?limit=100")
+      ).body.data.find((item) => item.id === ownNotice.id);
+      assert.equal(managerOwnCopy.read_at, null);
+      assert.equal(
+        (await adminAgent.post("/api/notifications/read-all").send({})).status,
+        204,
+      );
+      assert.equal(
+        (await adminAgent.get("/api/notifications")).body.unread_count,
+        0,
+      );
+      const [[receiptCount]] = await c.execute(
+        "SELECT COUNT(*) total FROM notification_reads WHERE user_id=? AND event_key=?",
+        [issued.body.id, ownNotice.id],
+      );
+      assert.equal(Number(receiptCount.total), 1);
       const product = await adminAgent.post("/api/products").send({
         sku: "SP-TEST",
         name: "Sản phẩm thử nghiệm",
@@ -284,11 +345,52 @@ test(
       assert.equal(restored.status, 201);
       assert.equal(restored.body.status, "Verified");
       assert.equal(restored.body.report.test_result, "PASS");
+      assert.equal(restored.body.report.tables.notification_reads.match, true);
+      assert.equal(Object.keys(restored.body.report.tables).length, 13);
       assert.equal(
         (await adminAgent.get("/api/admin/restores/" + restored.body.id)).body
           .status,
         "Verified",
       );
+      // Keep verification compatible with backups made before notification receipts existed.
+      const legacyId = randomUUID();
+      const sourceSql = await readFile(
+        join(env.backups, backup.body.id + ".sql"),
+        "utf8",
+      );
+      const legacySql = sourceSql.slice(
+        0,
+        sourceSql.indexOf("CREATE TABLE `notification_reads`"),
+      );
+      assert.ok(legacySql.length > 0 && legacySql.length < sourceSql.length);
+      const legacyManifest = JSON.parse(
+        await readFile(join(env.backups, backup.body.id + ".json"), "utf8"),
+      );
+      delete legacyManifest.tables.notification_reads;
+      legacyManifest.id = legacyId;
+      legacyManifest.sha256 = digest(legacySql);
+      await writeFile(join(env.backups, legacyId + ".sql"), legacySql);
+      await writeFile(
+        join(env.backups, legacyId + ".json"),
+        JSON.stringify(legacyManifest),
+      );
+      await c.execute(
+        "INSERT INTO backup_records(id,file_name,status,sha256) VALUES(?,?,'Success',?)",
+        [legacyId, legacyId + ".sql", legacyManifest.sha256],
+      );
+      const legacyRestored = await adminAgent
+        .post("/api/admin/restores")
+        .send({
+          backup_id: legacyId,
+          confirmation: "RESTORE_TO_ISOLATED_DATABASE",
+        });
+      assert.equal(
+        legacyRestored.status,
+        201,
+        JSON.stringify(legacyRestored.body),
+      );
+      assert.equal(legacyRestored.body.status, "Verified");
+      assert.equal(Object.keys(legacyRestored.body.report.tables).length, 12);
       const promote = await adminAgent
         .patch("/api/admin/users/" + target.id + "/access")
         .send({

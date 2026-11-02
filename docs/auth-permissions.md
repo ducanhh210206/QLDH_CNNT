@@ -39,7 +39,7 @@ API chỉ cho quản lý đang Active tạo nhân viên; kiểm tra lại quyề
 
 ## Cập nhật database đang có dữ liệu
 
-**Không chạy lại db:init.** Mã mới yêu cầu schema 002. Chạy từ thư mục gốc:
+**Không chạy lại db:init.** Mã hiện tại yêu cầu schema 003; runner bổ sung 002/003 còn thiếu. Chạy từ thư mục gốc:
 
 ```bash
 npm ci
@@ -52,7 +52,7 @@ Runner lấy khóa MySQL, tạo SQL snapshot + SHA-256 trong BACKUP_DIR (mặc �
 
 Tài khoản cũ được giữ role và trạng thái Active. Staff cũ có permissions NULL được giữ các quyền nghiệp vụ mặc định; đăng ký mới luôn Pending + danh sách quyền rỗng. Chỉ CLI `user:create` dành cho người quản trị máy chủ được phép tạo tài khoản đã duyệt trực tiếp; không phải API đăng ký công khai.
 
-Cài mới trên database rỗng vẫn dùng db:init: schema.sql chứa cả phiên bản 001 và 002. Các file 001_initial.sql, 002_user_access.sql lưu lịch sử cấu trúc; không tự chạy cả hai bằng tay trên DB đang có dữ liệu.
+Cài mới trên database rỗng vẫn dùng db:init: schema.sql chứa cả phiên bản 001, 002 và 003. Các file 001_initial.sql, 002_user_access.sql lưu lịch sử cấu trúc; không tự chạy cả hai bằng tay trên DB đang có dữ liệu.
 
 Sau migration, build lại BE Docker:
 

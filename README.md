@@ -26,7 +26,7 @@ Bản mới có **Nhân viên / Quản lý** (giữ giá trị API Staff/Admin).
 
 **Máy đã có database từ bản cũ:** dùng `npm run db:migrate` với quyền provisioning phù hợp, sau đó build lại BE; không chạy lại db:init. Runner tạo safety snapshot trước khi bổ sung schema. Xem [hướng dẫn phân quyền, migration và Google OAuth](docs/auth-permissions.md).
 
-**Máy cài mới:** làm theo các bước bên dưới; db:init tạo cả schema 001 và 002. Client ID/Secret Google không nằm trong Git: tự cấu hình để bật nút đăng nhập Google.
+**Máy cài mới:** làm theo các bước bên dưới; db:init tạo cả schema 001, 002 và 003. Client ID/Secret Google không nằm trong Git: tự cấu hình để bật nút đăng nhập Google.
 
 ## Chọn cách chạy trước khi cài
 
@@ -243,10 +243,10 @@ Remove-Item Env:CONFIRM_EMPTY_DATABASE
 Kết quả mong đợi:
 
 ```text
-Schema 001 và 002 đã được áp dụng.
+Schema 001, 002 và 003 đã được áp dụng.
 ```
 
-Script tạo database nếu chưa có, tạo các bảng từ `database/init/schema.sql` và ghi phiên bản migration 001 và 002. Script từ chối nếu database đã có bất kỳ bảng nào. **Không xóa bảng để chạy lại.** Nếu khởi tạo bị gián đoạn, kiểm tra các bảng đã tạo trước khi sửa tiếp vì DDL MySQL không rollback toàn bộ.
+Script tạo database nếu chưa có, tạo các bảng từ `database/init/schema.sql` và ghi phiên bản migration 001, 002 và 003. Script từ chối nếu database đã có bất kỳ bảng nào. **Không xóa bảng để chạy lại.** Nếu khởi tạo bị gián đoạn, kiểm tra các bảng đã tạo trước khi sửa tiếp vì DDL MySQL không rollback toàn bộ.
 
 ## 6. Tạo tài khoản đăng nhập website — chỉ thực hiện lần đầu
 
@@ -539,7 +539,7 @@ docs/         Tài liệu kỹ thuật và runbook
 |---|---|
 | npm ci | Cài toàn bộ dependency theo lockfile |
 | npm run db:init | Khởi tạo schema mới/rỗng, cần CONFIRM_EMPTY_DATABASE |
-| npm run db:migrate | Bổ sung schema 002 vào database cũ, có safety snapshot; cần quyền ALTER phù hợp |
+| npm run db:migrate | Bổ sung schema 002/003 còn thiếu vào database cũ, có safety snapshot; cần quyền ALTER phù hợp |
 | npm run user:create | Tạo tài khoản website, cần NEW_USERNAME/NEW_PASSWORD/NEW_ROLE |
 | npm run dev -w backend | Chạy riêng BE, cổng 5000 |
 | npm run dev -w frontend | Chạy riêng FE, cổng 5173 |
@@ -666,7 +666,7 @@ npm ci
 
 Giữ nguyên các tệp `.env` riêng của máy và dữ liệu MySQL. Đối chiếu `.env.example` để bổ sung biến cấu hình mới nếu có; không chép đè secret đang dùng bằng mẫu.
 
-### 16.2. Nâng cấp database bản cũ lên schema 002
+### 16.2. Nâng cấp database bản cũ lên schema 003
 
 **Thực hiện trước khi chạy BE mới.** Nếu cài mới bằng schema hiện tại hoặc đã chạy migration thành công, bỏ qua bước này. Không chạy lại `db:init` trên database đang có dữ liệu.
 
@@ -685,7 +685,7 @@ Giữ nguyên các tệp `.env` riêng của máy và dữ liệu MySQL. Đối 
    npm run db:migrate
    ```
 
-   Runner lưu snapshot SQL + SHA-256 trong `database/backups/` trên máy trước khi sửa cấu trúc. Bảo vệ và sao chép bản này ra nơi lưu trữ riêng. Khi thành công sẽ có `Migration 002 hoàn tất...`; nếu đã nâng cấp sẽ có `Schema 002 đã được áp dụng.`. Nếu lỗi, xử lý quyền/kết nối trước khi tiếp tục; không xóa bảng hoặc volume.
+   Runner lưu snapshot SQL + SHA-256 trong `database/backups/` trên máy trước khi sửa cấu trúc. Bảo vệ và sao chép bản này ra nơi lưu trữ riêng. Khi thành công sẽ có `Migration 003_notifications hoàn tất...` (và 002 nếu còn thiếu); nếu đã nâng cấp sẽ có `Schema hiện tại đã được áp dụng (002 và 003).`. Nếu lỗi, xử lý quyền/kết nối trước khi tiếp tục; không xóa bảng hoặc volume.
 
 Tài khoản và đơn hàng cũ được giữ lại. Tài khoản cũ vẫn Active; nhân viên đăng ký mới phải chờ duyệt. Migration chỉ dùng cho máy đã có schema 001; máy mới thực hiện bước 5–6.
 
@@ -717,3 +717,9 @@ Luồng Node và BE Docker kết nối MySQL 8.4.13 đã chạy trên macOS tron
 - [Docker Desktop: kết nối mạng và publish cổng](https://docs.docker.com/desktop/features/networking/).
 - [Docker Desktop: container kết nối dịch vụ trên máy chủ](https://docs.docker.com/desktop/features/networking/how-tos/).
 - [MySQL 8.4: cấu hình và dữ liệu khi chạy Docker](https://dev.mysql.com/doc/refman/8.4/en/docker-mysql-more-topics.html).
+
+## Thông báo trong ứng dụng
+
+Bấm chuông ở góc trên để xem thông báo đơn hàng, tài khoản và kết quả sao lưu/phục hồi theo quyền của người đăng nhập. Có số chưa đọc, đánh dấu từng mục hoặc **Đọc tất cả**, tự cập nhật mỗi 15 giây. Trạng thái đọc lưu riêng từng tài khoản trong MySQL.
+
+Database cũ cần chạy `npm run db:migrate` trước khi khởi động bản BE mới để thêm bảng `notification_reads` (schema 003). Máy cài mới dùng `db:init` như hướng dẫn. Xem [chi tiết thông báo](docs/notifications.md).

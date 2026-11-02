@@ -126,7 +126,7 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 
 | File | Công dụng |
 |---|---|
-| [database/init/schema.sql](../database/init/schema.sql) | Định nghĩa 12 bảng ứng dụng, cột, khóa, index và ràng buộc; ghi migration 001_initial và 002_user_access. Là file init-db.js thực sự đọc để khởi tạo lần đầu. |
+| [database/init/schema.sql](../database/init/schema.sql) | Định nghĩa 13 bảng ứng dụng, cột, khóa, index và ràng buộc; ghi migration 001_initial, 002_user_access và 003_notifications. Là file init-db.js thực sự đọc để khởi tạo lần đầu. |
 | [database/migrations/001_initial.sql](../database/migrations/001_initial.sql) | Lưu cấu trúc phiên bản đầu tiên trước phần phân quyền mới; giữ làm lịch sử và kiểm thử nâng cấp. Không chạy lại trên database đang có dữ liệu. |
 | [database/seeds/sample_orders.sql](../database/seeds/sample_orders.sql) | Hiện chỉ chứa chú thích/hướng dẫn, chưa có INSERT dữ liệu mẫu. Đơn hàng phải tạo qua ứng dụng hoặc test cách ly. |
 | [database/backups/.gitkeep](../database/backups/.gitkeep) | File giữ thư mục backup trong Git khi chưa có bản sao lưu; không chứa dữ liệu MySQL. |
@@ -191,7 +191,7 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 | [frontend/src/pages/TransactionHistory.jsx](../frontend/src/pages/TransactionHistory.jsx) | Tra cứu lịch sử tạo/chuyển trạng thái đơn hàng. |
 | [frontend/src/pages/UserManagement.jsx](../frontend/src/pages/UserManagement.jsx) | Quản lý xét duyệt nhân viên, cấp quyền, tạm khóa và xem lịch sử thay đổi. |
 | [frontend/src/utils/permissions.js](../frontend/src/utils/permissions.js) | Hàm kiểm tra quyền và nhãn tiếng Việt để hiển thị menu/chức năng. |
-| [scripts/migrate-db.js](../scripts/migrate-db.js) | Nâng cấp schema đang có lên 002; khóa MySQL, tạo snapshot bảo vệ trước DDL và hỗ trợ chạy lại. |
+| [scripts/migrate-db.js](../scripts/migrate-db.js) | Nâng cấp schema đang có lên 003 (bổ sung 002 nếu thiếu); khóa MySQL, tạo snapshot bảo vệ trước DDL và hỗ trợ chạy lại. |
 | [docs/auth-permissions.md](../docs/auth-permissions.md) | Hướng dẫn phân quyền, xét duyệt, nâng cấp database và cấu hình Google OAuth. |
 | [docs/issued-accounts-preview.png](../docs/issued-accounts-preview.png) | Ảnh danh sách tài khoản đã cấp và các quyền bằng dữ liệu thử cách ly. |
 | [docs/create-staff-preview.png](../docs/create-staff-preview.png) | Ảnh biểu mẫu quản lý tạo và cấp quyền tài khoản nhân viên. |
@@ -241,3 +241,14 @@ Khi BE chạy Docker, backup runtime nằm trong named volume gắn tại /app/d
 | [backend/tests/hosting.test.js](../backend/tests/hosting.test.js) | Kiểm tra frontend cùng origin, ranh giới API và thiết lập cloud/TLS. |
 | [deploy/hosting.env.example](../deploy/hosting.env.example) | Mẫu cấu hình riêng để khởi tạo DB cloud từ máy cá nhân, không chứa credential thật. |
 | [docs/deploy-render-aiven.md](deploy-render-aiven.md) | Hướng dẫn tạo MySQL Aiven, Web Service Render, Google callback và giới hạn Free. |
+
+## Các file của chức năng thông báo
+
+| File | Công dụng |
+|---|---|
+| backend/src/repositories/notificationRepository.js | Tổng hợp sự kiện theo quyền và lưu trạng thái đọc riêng cho mỗi tài khoản. |
+| backend/src/routes/notificationRoutes.js | API danh sách, đánh dấu một mục và đọc tất cả; yêu cầu đăng nhập. |
+| database/migrations/003_notifications.sql | Tạo bảng notification_reads lưu người đọc, mã sự kiện và thời điểm đọc. |
+| frontend/src/components/NotificationCenter.jsx | Chuông, số chưa đọc, danh sách phân trang và thao tác đọc. |
+| backend/tests/notifications.test.js | Kiểm tra xác thực, phân quyền, phân trang và bảo vệ trạng thái đọc. |
+| docs/notifications.md | Hướng dẫn dùng và nâng cấp database. |

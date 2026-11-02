@@ -16,8 +16,12 @@ try {
     throw Error("Không lấy được khóa migration/backup.");
   locked = true;
   const [versions] = await c.query("SELECT version FROM schema_migrations");
-  if (versions.some((r) => r.version === "002_user_access")) {
-    console.log("Schema 002 đã được áp dụng.");
+  const migrations = ["002_user_access", "003_notifications"];
+  const pending = migrations.filter(
+    (version) => !versions.some((row) => row.version === version),
+  );
+  if (!pending.length) {
+    console.log("Schema hiện tại đã được áp dụng (002 và 003).");
   } else {
     if (!versions.some((r) => r.version === "001_initial"))
       throw Error("Cần schema 001 trước.");
@@ -59,7 +63,7 @@ try {
     await mkdir(env.backups, { recursive: true, mode: 0o700 });
     const file = join(
       env.backups,
-      "before-schema-002-" + randomUUID() + ".sql",
+      "before-" + pending[0] + "-" + randomUUID() + ".sql",
     );
     await writeFile(file, backup, { flag: "wx", mode: 0o600 });
     await writeFile(file + ".sha256", digest(backup) + "\n", {
@@ -67,40 +71,44 @@ try {
       mode: 0o600,
     });
     console.log("Đã lưu safety snapshot và SHA-256 tại " + file);
-    const source = await readFile(
-      new URL("../database/migrations/002_user_access.sql", import.meta.url),
-      "utf8",
-    );
-    const statements = source
-      .replace(/^--.*$/gm, "")
-      .split(";")
-      .map((s) => s.trim())
-      .filter(Boolean);
-    for (const statement of statements) {
-      const add = statement.match(/^ALTER TABLE users ADD COLUMN (\w+)/);
-      if (add) {
-        const [existing] = await c.execute(
-          "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME=?",
-          [env.db.database, "users", add[1]],
-        );
-        if (existing.length) continue;
+    for (const version of pending) {
+      const source = await readFile(
+        new URL("../database/migrations/" + version + ".sql", import.meta.url),
+        "utf8",
+      );
+      const statements = source
+        .replace(/^--.*$/gm, "")
+        .split(";")
+        .map((s) => s.trim())
+        .filter(Boolean);
+      for (const statement of statements) {
+        const add = statement.match(/^ALTER TABLE users ADD COLUMN (\w+)/);
+        if (add) {
+          const [existing] = await c.execute(
+            "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME=?",
+            [env.db.database, "users", add[1]],
+          );
+          if (existing.length) continue;
+        }
+        const create = statement.match(/^CREATE TABLE (\w+)/);
+        if (create) {
+          const [existing] = await c.execute(
+            "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?",
+            [env.db.database, create[1]],
+          );
+          if (existing.length) continue;
+        }
+        await c.query(statement);
       }
-      const create = statement.match(/^CREATE TABLE (\w+)/);
-      if (create) {
-        const [existing] = await c.execute(
-          "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA=? AND TABLE_NAME=?",
-          [env.db.database, create[1]],
-        );
-        if (existing.length) continue;
-      }
-      await c.query(statement);
+      await c.execute("INSERT INTO schema_migrations(version) VALUES(?)", [
+        version,
+      ]);
+      console.log(
+        "Migration " +
+          version +
+          " hoàn tất. Tài khoản và dữ liệu hiện có được giữ nguyên.",
+      );
     }
-    await c.execute("INSERT INTO schema_migrations(version) VALUES(?)", [
-      "002_user_access",
-    ]);
-    console.log(
-      "Migration 002 hoàn tất. Tài khoản và dữ liệu hiện có được giữ nguyên.",
-    );
   }
 } catch (e) {
   if (c) await c.rollback().catch(() => {});

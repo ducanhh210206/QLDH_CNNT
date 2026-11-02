@@ -38,7 +38,7 @@ try {
       "utf8",
     ),
   );
-  console.log("Schema 001 và 002 đã được áp dụng.");
+  console.log("Schema 001, 002 và 003 đã được áp dụng.");
 } finally {
   await c.end();
 }

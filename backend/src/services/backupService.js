@@ -21,6 +21,7 @@ const tables = [
   "user_access_history",
   "oauth_login_attempts",
   "products",
+  "notification_reads",
 ];
 let busy = false;
 export async function listBackups() {
@@ -179,7 +180,8 @@ export async function restoreBackup(backupId, userId, confirmation) {
       backup_created_at: manifest.created_at,
       tables: {},
     };
-    for (const table of tables) {
+    // Historical schema-002 backups have no notification read receipts.
+    for (const table of tables.filter(table => table !== "notification_reads" || manifest.tables[table])) {
       const [rows] = await c.query("SELECT * FROM `" + table + "`");
       report.tables[table] = {
         count: rows.length,

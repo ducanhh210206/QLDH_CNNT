@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 test(
-  "migration 002 keeps existing users/orders and is safely repeatable",
+  "migrations 002/003 keep existing users/orders and are safely repeatable",
   { skip: !process.env.RUN_DB_INTEGRATION },
   async () => {
     const { env, directDatabaseConfig } = await import("../src/config/env.js");
@@ -63,6 +63,11 @@ test(
       await c.query("SELECT 1 FROM user_access_history LIMIT 1");
       await c.query("SELECT 1 FROM oauth_login_attempts LIMIT 1");
       await c.query("SELECT 1 FROM products LIMIT 1");
+      await c.query("SELECT 1 FROM notification_reads LIMIT 1");
+      const [notificationVersion] = await c.query(
+        "SELECT version FROM schema_migrations WHERE version='003_notifications'",
+      );
+      assert.equal(notificationVersion.length, 1);
       console.log("Migration test schema retained: " + name);
     } finally {
       await c.end();

@@ -9,7 +9,6 @@ import {
   Database,
   Settings,
   Search,
-  Bell,
   Sun,
   Moon,
   LogOut,
@@ -34,6 +33,7 @@ import SettingsPage from "./pages/Settings";
 import Products from "./pages/Products";
 import TransactionHistory from "./pages/TransactionHistory";
 import UserManagement from "./pages/UserManagement";
+import NotificationCenter from "./components/NotificationCenter";
 import { can, roleLabel } from "./utils/permissions";
 const nav = [
   ["dashboard", "Thống kê", LayoutDashboard, "statistics.read"],
@@ -59,7 +59,8 @@ export default function App() {
     [online, setOnline] = useState(null),
     [search, setSearch] = useState(""),
     [orderSearch, setOrderSearch] = useState(""),
-    [notices, setNotices] = useState(false);
+    [userListStatus, setUserListStatus] = useState("Active"),
+    [userListVersion, setUserListVersion] = useState(0);
   useEffect(() => {
     api("/api/auth/me")
       .then(setUser)
@@ -111,7 +112,11 @@ export default function App() {
     const t = setTimeout(() => setToast(""), 6000);
     return () => clearTimeout(t);
   }, [toast]);
-  function navigate(p) {
+  function navigate(p, options = {}) {
+    if (p === "users") {
+      setUserListStatus(options.status ?? "Active");
+      setUserListVersion((value) => value + 1);
+    }
     setPage(p);
     setMobile(false);
   }
@@ -260,26 +265,14 @@ export default function App() {
             >
               {theme === "dark" ? <Sun size={19} /> : <Moon size={19} />}
             </button>
-            <button
-              className="icon-button"
-              onClick={() => setNotices((n) => !n)}
-              aria-label="Thông báo"
-            >
-              <Bell size={19} />
-            </button>
+            <NotificationCenter
+              key={user.id}
+              user={user}
+              navigate={navigate}
+              online={online}
+            />
           </div>
         </header>
-        {notices && (
-          <div className="notification-pop">
-            <strong>Thông báo hệ thống</strong>
-            <p>
-              {online
-                ? "Backend và MySQL vừa phản hồi kiểm tra readiness."
-                : "Kết nối chưa sẵn sàng. Vui lòng thử lại hoặc liên hệ quản lý."}
-            </p>
-            <small>Kiểm tra định kỳ 15 giây</small>
-          </div>
-        )}
         <div className="page-content" key={user.id}>
           {currentPage === "dashboard" ? (
             <Dashboard {...props} />
@@ -288,7 +281,11 @@ export default function App() {
           ) : currentPage === "transactions" ? (
             <TransactionHistory {...props} />
           ) : currentPage === "users" ? (
-            <UserManagement {...props} />
+            <UserManagement
+              {...props}
+              key={userListVersion}
+              initialStatus={userListStatus}
+            />
           ) : currentPage === "orders" ? (
             <OrderList {...props} initialSearch={orderSearch} />
           ) : currentPage === "create" ? (

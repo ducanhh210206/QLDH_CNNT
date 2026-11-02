@@ -105,3 +105,10 @@ Lý do SKIP: Docker Engine không phản hồi qua socket khi kiểm tra có quy
 - Job Running có thể còn lại nếu process bị dừng đột ngột; kiểm tra log/tệp/schema cách ly trước khi thử lại. Schema cách ly không tự dọn.
 - Log monitoring chưa xoay vòng tự động; session hết hạn chưa có job dọn. Cần chính sách lưu trữ khi vận hành lâu dài.
 - RTO/RPO chưa đo, giữ null. Thời gian restore riêng không được coi là RTO hệ thống.
+
+## 02/11/2026 — Trung tâm thông báo
+
+- Bộ kiểm thử MySQL cách ly: 41/41 đạt, gồm migration 002/003 chạy lại không mất dữ liệu; phân quyền thông báo, trạng thái đọc độc lập, đọc lặp lại và đọc tất cả.
+- Backup/restore xác minh cả bản mới 13 bảng và bản cũ 12 bảng không có notification_reads.
+- Build FE production thành công. Đã thử bằng tài khoản kiểm thử: mở chuông, số chưa đọc, đọc từng mục, đọc tất cả và chuyển sang trang đơn hàng.
+- [Ảnh giao diện với dữ liệu kiểm thử](notifications-preview.png). Kết quả này không tự xác nhận bản mới đã được triển khai trên Render.

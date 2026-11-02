@@ -340,8 +340,12 @@ function Review({ target, onClose, onSaved }) {
     </Modal>
   );
 }
-export default function UserManagement({ user, notify }) {
-  const [status, setStatus] = useState("Active"),
+export default function UserManagement({
+  user,
+  notify,
+  initialStatus = "Active",
+}) {
+  const [status, setStatus] = useState(initialStatus),
     [search, setSearch] = useState(""),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(1),
