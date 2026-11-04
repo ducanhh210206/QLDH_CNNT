@@ -74,3 +74,6 @@ INSERT INTO schema_migrations(version) VALUES ('003_notifications');
 ALTER TABLE products ADD COLUMN stock_quantity BIGINT UNSIGNED NOT NULL DEFAULT 0;
 ALTER TABLE orders ADD COLUMN product_id CHAR(36) NULL;
 INSERT INTO schema_migrations(version) VALUES ('004_product_stock');
+
+ALTER TABLE products ADD COLUMN version INT UNSIGNED NOT NULL DEFAULT 1;
+INSERT INTO schema_migrations(version) VALUES ('005_product_edit');

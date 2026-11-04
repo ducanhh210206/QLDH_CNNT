@@ -120,3 +120,10 @@ Lý do SKIP: Docker Engine không phản hồi qua socket khi kiểm tra có quy
 - Kiểm tra quyền nhập kho, số lượng sai, sản phẩm không tồn tại, tên sản phẩm lấy từ danh mục và đơn cũ không tự hoàn kho.
 - Migration 002/003/004 chạy lại được, giữ tài khoản và đơn cũ; backup/restore vẫn xác minh đủ 13 bảng và nhận bản cũ 12 bảng.
 - Đã thử giao diện với dữ liệu riêng: đặt 3 khi kho có 2 bị khóa lưu, đặt đúng 2 thành công và tồn về 0; nhập thêm 3 hiển thị tồn 3.
+
+## 04/11/2026 — Sửa sản phẩm trong danh mục
+
+- 42/42 kiểm thử đạt trên MySQL cách ly, gồm cập nhật tên/giá/tồn, quyền truy cập, dữ liệu không hợp lệ và không tìm thấy sản phẩm.
+- Hai người cùng sửa cùng phiên bản chỉ một người thành công. Có đơn mới, hủy đơn hoặc nhập kho sẽ làm cửa sổ sửa cũ hết hiệu lực; kho quay lại đúng số cũ vẫn không cho ghi đè bằng phiên bản cũ.
+- Kiểm thử sửa sản phẩm đồng thời tạo đơn không mất biến động tồn. Đơn cũ giữ nguyên tên và tổng tiền. Migration 005 chạy lại được, giá trị mặc định version=1.
+- Đã thử giao diện riêng: thêm mới với số lượng 6; sửa và mở lại sản phẩm có tên mới, giá 150.000₫, tồn 7.

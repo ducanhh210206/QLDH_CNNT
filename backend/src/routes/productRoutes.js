@@ -14,3 +14,7 @@ productRoutes.post(
   permission("products.create"),
   async (req, res) => res.json(await svc.addStock(req.params.id, req.body)),
 );
+
+productRoutes.patch("/:id", permission("products.create"), async (req, res) =>
+  res.json(await svc.update(req.params.id, req.body)),
+);

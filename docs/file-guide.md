@@ -260,3 +260,5 @@ Khi BE chạy Docker, backup runtime nằm trong named volume gắn tại /app/d
 | database/migrations/004_product_stock.sql | Thêm stock_quantity cho sản phẩm và product_id cho đơn mới; giữ đơn cũ chưa liên kết. |
 | backend/tests/inventory.integration.test.js | Kiểm thử MySQL thật về thiếu hàng, đặt đồng thời, gửi lại, hoàn kho và rollback. |
 | docs/product-stock.md | Quy tắc tồn kho, API và hướng dẫn nâng cấp. |
+
+Migration `database/migrations/005_product_edit.sql` thêm phiên bản sản phẩm để sửa tên, giá và tồn kho có kiểm tra thay đổi đồng thời.

@@ -47,11 +47,27 @@ export async function create(data, userId) {
 
 export async function addStock(id, quantity) {
   const [result] = await pool.execute(
-    "UPDATE products SET stock_quantity=stock_quantity+? WHERE id=?",
+    "UPDATE products SET stock_quantity=stock_quantity+?,version=version+1 WHERE id=?",
     [quantity, id],
   );
   if (!result.affectedRows)
     fail(404, "PRODUCT_NOT_FOUND", "Không tìm thấy sản phẩm.");
   const [rows] = await pool.execute("SELECT * FROM products WHERE id=?", [id]);
+  return rows[0];
+}
+
+export async function update(id, data) {
+  const [result] = await pool.execute(
+    "UPDATE products SET name=?,unit_price=?,stock_quantity=?,version=version+1 WHERE id=? AND version=?",
+    [data.name, data.unit_price, data.stock_quantity, id, data.version],
+  );
+  const [rows] = await pool.execute("SELECT * FROM products WHERE id=?", [id]);
+  if (!rows.length) fail(404, "PRODUCT_NOT_FOUND", "Không tìm thấy sản phẩm.");
+  if (!result.affectedRows)
+    fail(
+      409,
+      "PRODUCT_VERSION_CONFLICT",
+      "Sản phẩm hoặc tồn kho đã thay đổi. Hãy bấm Sửa lại để tải thông tin mới trước khi lưu.",
+    );
   return rows[0];
 }

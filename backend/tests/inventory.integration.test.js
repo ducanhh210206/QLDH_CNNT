@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 
 test(
-  "MySQL inventory: no overselling, safe retries, cancellation, stock permissions and rollback",
+  "MySQL inventory: no overselling, safe retries, cancellation, stock permissions, concurrent edits and rollback",
   { skip: !process.env.RUN_DB_INTEGRATION },
   async () => {
     process.env.DB_NAME =
@@ -55,14 +55,12 @@ test(
           ).status,
           200,
         );
-      const product = await manager
-        .post("/api/products")
-        .send({
-          sku: "STOCK-1",
-          name: "Hàng tồn kho",
-          unit_price: "100.50",
-          stock_quantity: 5,
-        });
+      const product = await manager.post("/api/products").send({
+        sku: "STOCK-1",
+        name: "Hàng tồn kho",
+        unit_price: "100.50",
+        stock_quantity: 5,
+      });
       assert.equal(product.status, 201, JSON.stringify(product.body));
       const pid = product.body.id;
       const stock = async () =>
@@ -79,17 +77,14 @@ test(
         status = "Pending",
         product_id = pid,
       ) =>
-        manager
-          .post("/api/orders")
-          .set("Idempotency-Key", key)
-          .send({
-            product_id,
-            customer_name: "Khách thử",
-            product_name: "Tên giả gửi từ client",
-            quantity,
-            total_amount: "100.50",
-            status,
-          });
+        manager.post("/api/orders").set("Idempotency-Key", key).send({
+          product_id,
+          customer_name: "Khách thử",
+          product_name: "Tên giả gửi từ client",
+          quantity,
+          total_amount: "100.50",
+          status,
+        });
       assert.equal((await staff.get("/api/products")).status, 403);
       assert.equal((await staff.get("/api/orders/products")).status, 200);
       assert.equal(
@@ -199,6 +194,132 @@ test(
         200,
       );
       assert.equal(await stock(), 5);
+      // Product edits use a revision shared with every stock movement.
+      const currentProduct = async () =>
+        (await c.execute("SELECT * FROM products WHERE id=?", [pid]))[0][0];
+      const beforeEdit = await currentProduct();
+      const editBody = {
+        name: "  Sản phẩm đã sửa  ",
+        unit_price: "250.75",
+        stock_quantity: 12,
+        version: beforeEdit.version,
+      };
+      assert.equal(
+        (await staff.patch("/api/products/" + pid).send(editBody)).status,
+        403,
+      );
+      for (const patch of [
+        { name: " " },
+        { unit_price: "-1" },
+        { unit_price: "1.001" },
+        { stock_quantity: -1 },
+        { stock_quantity: 1.5 },
+        { version: 0 },
+        { sku: "CHANGE-SKU" },
+      ]) {
+        assert.equal(
+          (
+            await manager
+              .patch("/api/products/" + pid)
+              .send({ ...editBody, ...patch })
+          ).status,
+          400,
+        );
+      }
+      assert.equal(
+        (await manager.patch("/api/products/" + randomUUID()).send(editBody))
+          .status,
+        404,
+      );
+      const edited = await manager.patch("/api/products/" + pid).send(editBody);
+      assert.equal(edited.status, 200, JSON.stringify(edited.body));
+      assert.equal(edited.body.name, "Sản phẩm đã sửa");
+      assert.equal(edited.body.unit_price, "250.75");
+      assert.equal(Number(edited.body.stock_quantity), 12);
+      assert.equal(edited.body.version, beforeEdit.version + 1);
+      assert.equal(
+        (await manager.patch("/api/products/" + pid).send(editBody)).status,
+        409,
+      );
+      assert.equal(await stock(), 12);
+      const [[oldOrder]] = await c.execute(
+        "SELECT product_name,total_amount FROM orders WHERE id=?",
+        [winning.id],
+      );
+      assert.equal(oldOrder.product_name, "Hàng tồn kho");
+      assert.equal(oldOrder.total_amount, "100.50");
+      const concurrentVersion = (await currentProduct()).version;
+      const edits = await Promise.all(
+        [8, 9].map((stock_quantity) =>
+          manager
+            .patch("/api/products/" + pid)
+            .send({ ...editBody, version: concurrentVersion, stock_quantity }),
+        ),
+      );
+      assert.deepEqual(edits.map((r) => r.status).sort(), [200, 409]);
+      assert.equal(
+        await stock(),
+        Number(edits.find((r) => r.status === 200).body.stock_quantity),
+      );
+      const stale = await currentProduct();
+      const ordered = await submit(1);
+      assert.equal(ordered.status, 201);
+      assert.equal(ordered.body.order.product_name, "Sản phẩm đã sửa");
+      assert.equal(
+        (
+          await manager
+            .patch("/api/products/" + pid)
+            .send({ ...editBody, version: stale.version })
+        ).status,
+        409,
+      );
+      // Stock returning to the same count must not make an old edit valid (ABA).
+      assert.equal(
+        (
+          await manager
+            .patch("/api/orders/" + ordered.body.order.id + "/status")
+            .send({ status: "Cancelled", version: 1 })
+        ).status,
+        200,
+      );
+      assert.equal(await stock(), Number(stale.stock_quantity));
+      assert.equal(
+        (
+          await manager
+            .patch("/api/products/" + pid)
+            .send({ ...editBody, version: stale.version })
+        ).status,
+        409,
+      );
+      const beforeReceive = (await currentProduct()).version;
+      assert.equal(
+        (
+          await manager
+            .post("/api/products/" + pid + "/stock")
+            .send({ quantity: 1 })
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          await manager
+            .patch("/api/products/" + pid)
+            .send({ ...editBody, version: beforeReceive })
+        ).status,
+        409,
+      );
+      const raceVersion = (await currentProduct()).version;
+      const race = await Promise.all([
+        submit(2),
+        manager
+          .patch("/api/products/" + pid)
+          .send({ ...editBody, version: raceVersion, stock_quantity: 7 }),
+      ]);
+      assert.equal(race[0].status, 201);
+      assert.ok([200, 409].includes(race[1].status));
+      const expected =
+        race[1].status === 200 ? 5 : Number(stale.stock_quantity) - 1;
+      assert.equal(await stock(), expected);
       console.log("Inventory integration checks passed in isolated schema.");
     } finally {
       await c.end();

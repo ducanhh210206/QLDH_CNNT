@@ -49,3 +49,10 @@ export const orderOptions = (q) =>
       q,
     ),
   );
+
+export const productEditSchema = productSchema
+  .pick({ name: true, unit_price: true, stock_quantity: true })
+  .extend({ version: z.number().int().min(1).max(4294967295) })
+  .strict();
+export const update = (id, body) =>
+  repo.update(validId(id), parse(productEditSchema, body));

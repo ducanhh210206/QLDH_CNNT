@@ -97,7 +97,7 @@ export async function create(data, userId, key) {
       );
       if (data.status !== "Cancelled")
         await c.execute(
-          "UPDATE products SET stock_quantity=stock_quantity-? WHERE id=?",
+          "UPDATE products SET stock_quantity=stock_quantity-?,version=version+1 WHERE id=?",
           [data.quantity, product.id],
         );
       await c.execute(
@@ -141,7 +141,7 @@ export async function updateStatus(id, status, version, userId) {
     assertTransition(old, status, version);
     if (status === "Cancelled" && old.product_id)
       await c.execute(
-        "UPDATE products SET stock_quantity=stock_quantity+? WHERE id=?",
+        "UPDATE products SET stock_quantity=stock_quantity+?,version=version+1 WHERE id=?",
         [old.quantity, old.product_id],
       );
     await c.execute(

@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 test(
-  "migrations 002/003/004 keep existing users/orders and are safely repeatable",
+  "migrations 002/003/004/005 keep existing users/orders and are safely repeatable",
   { skip: !process.env.RUN_DB_INTEGRATION },
   async () => {
     const { env, directDatabaseConfig } = await import("../src/config/env.js");
@@ -73,14 +73,19 @@ test(
         "SELECT version FROM schema_migrations WHERE version='004_product_stock'",
       );
       assert.equal(stockVersion.length, 1);
+      const [editVersion] = await c.query(
+        "SELECT version FROM schema_migrations WHERE version='005_product_edit'",
+      );
+      assert.equal(editVersion.length, 1);
       await c.execute(
         "INSERT INTO products(id,sku,name,unit_price,created_by) VALUES(?,'LEGACY-TEST','Legacy',1,?)",
         [randomUUID(), uid],
       );
       const [[stock]] = await c.query(
-        "SELECT stock_quantity FROM products WHERE sku='LEGACY-TEST'",
+        "SELECT stock_quantity,version FROM products WHERE sku='LEGACY-TEST'",
       );
       assert.equal(Number(stock.stock_quantity), 0);
+      assert.equal(stock.version, 1);
       console.log("Migration test schema retained: " + name);
     } finally {
       await c.end();

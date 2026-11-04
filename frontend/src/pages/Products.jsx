@@ -5,6 +5,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Save,
+  Pencil,
 } from "lucide-react";
 import { api, money, date } from "../services/api";
 import {
@@ -15,6 +16,7 @@ import {
   Loading,
   ErrorBox,
   Refresh,
+  Modal,
 } from "../components/common";
 import { can } from "../utils/permissions";
 export default function Products({ user, notify }) {
@@ -23,8 +25,10 @@ export default function Products({ user, notify }) {
     [page, setPage] = useState(1),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
-    [stockBusy, setStockBusy] = useState(null),
-    [stockError, setStockError] = useState("");
+    [editing, setEditing] = useState(null),
+    [editBusy, setEditBusy] = useState(false),
+    [editError, setEditError] = useState(""),
+    [pageError, setPageError] = useState("");
   useEffect(() => {
     const t = setTimeout(() => {
       setQuery(search);
@@ -35,29 +39,42 @@ export default function Products({ user, notify }) {
   const list = useData(
     "/api/products?" + new URLSearchParams({ page, limit: 20, search: query }),
   );
-  async function receiveStock(e, id) {
+  function openEditor(item) {
+    setEditError("");
+    setPageError("");
+    setEditing({ ...item, stock_quantity: Number(item.stock_quantity) });
+  }
+  async function saveEdit(e) {
     e.preventDefault();
-    const form = e.currentTarget;
-    const quantity = Number(new FormData(form).get("quantity"));
-    setStockBusy(id);
-    setStockError("");
+    if (editBusy) return;
+    setEditBusy(true);
+    setEditError("");
     try {
-      await api("/api/products/" + id + "/stock", {
-        method: "POST",
-        body: JSON.stringify({ quantity }),
+      await api("/api/products/" + editing.id, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: editing.name,
+          unit_price: editing.unit_price,
+          stock_quantity: Number(editing.stock_quantity),
+          version: editing.version,
+        }),
       });
-      form.reset();
+      setEditing(null);
       list.reload();
-      notify("Đã nhập thêm " + quantity + " sản phẩm vào kho.");
+      notify("Đã cập nhật tên, giá bán và số lượng sản phẩm.");
     } catch (e) {
-      setStockError(
-        e.uncertain
-          ? "Chưa xác định kết quả nhập kho. Hãy làm mới và kiểm tra số lượng trước khi nhập lại."
-          : e.message,
-      );
-      list.reload();
+      if (e.status === 409) {
+        setEditing(null);
+        setPageError(e.message);
+        list.reload();
+      } else
+        setEditError(
+          e.uncertain
+            ? "Chưa xác định kết quả lưu. Đóng cửa sổ, làm mới danh mục và kiểm tra trước khi sửa lại."
+            : e.message,
+        );
     } finally {
-      setStockBusy(null);
+      setEditBusy(false);
     }
   }
   async function submit(e) {
@@ -111,7 +128,7 @@ export default function Products({ user, notify }) {
               />
             </div>
           </div>
-          <ErrorBox error={stockError} />
+          <ErrorBox error={pageError} retry={list.reload} />
           <ErrorBox error={list.error} retry={list.reload} />
           {list.loading ? (
             <Loading />
@@ -127,7 +144,7 @@ export default function Products({ user, notify }) {
                     <th>GIÁ BÁN</th>
                     <th>TỒN KHO</th>
                     <th>NGÀY THÊM</th>
-                    {can(user, "products.create") && <th>NHẬP KHO</th>}
+                    {can(user, "products.create") && <th>THAO TÁC</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -152,30 +169,15 @@ export default function Products({ user, notify }) {
                       <td>{date(item.created_at)}</td>
                       {can(user, "products.create") && (
                         <td>
-                          <form
-                            className="stock-form"
-                            onSubmit={(e) => receiveStock(e, item.id)}
+                          <button
+                            type="button"
+                            className="button secondary"
+                            onClick={() => openEditor(item)}
+                            aria-label={"Sửa sản phẩm " + item.sku}
                           >
-                            <input
-                              name="quantity"
-                              type="number"
-                              min="1"
-                              max="1000000000"
-                              step="1"
-                              required
-                              aria-label={"Số lượng nhập kho " + item.sku}
-                              placeholder="Số lượng"
-                              disabled={stockBusy !== null}
-                            />
-                            <button
-                              className="button secondary"
-                              disabled={stockBusy !== null}
-                            >
-                              {stockBusy === item.id
-                                ? "Đang nhập…"
-                                : "Nhập kho"}
-                            </button>
-                          </form>
+                            <Pencil size={15} />
+                            Sửa
+                          </button>
                         </td>
                       )}
                     </tr>
@@ -247,7 +249,7 @@ export default function Products({ user, notify }) {
                   />
                 </label>
                 <label>
-                  Số lượng tồn kho ban đầu
+                  Số lượng sản phẩm
                   <input
                     name="stock_quantity"
                     type="number"
@@ -275,6 +277,80 @@ export default function Products({ user, notify }) {
           </Panel>
         )}
       </div>
+      {editing && (
+        <Modal
+          title="Sửa sản phẩm"
+          onClose={() => {
+            if (!editBusy) setEditing(null);
+          }}
+        >
+          <form className="order-form product-edit-form" onSubmit={saveEdit}>
+            <p className="muted">Mã sản phẩm: {editing.sku}</p>
+            <ErrorBox error={editError} />
+            <fieldset disabled={editBusy}>
+              <label>
+                Tên sản phẩm
+                <input
+                  name="name"
+                  value={editing.name}
+                  onChange={(e) =>
+                    setEditing({ ...editing, name: e.target.value })
+                  }
+                  required
+                  maxLength={200}
+                />
+              </label>
+              <label>
+                Giá bán (VND)
+                <input
+                  name="unit_price"
+                  type="number"
+                  min="0"
+                  max="999999999999.99"
+                  step="0.01"
+                  required
+                  value={editing.unit_price}
+                  onChange={(e) =>
+                    setEditing({ ...editing, unit_price: e.target.value })
+                  }
+                />
+              </label>
+              <label>
+                Số lượng tồn kho
+                <input
+                  name="stock_quantity"
+                  type="number"
+                  min="0"
+                  max="1000000000"
+                  step="1"
+                  required
+                  value={editing.stock_quantity}
+                  onChange={(e) =>
+                    setEditing({ ...editing, stock_quantity: e.target.value })
+                  }
+                />
+                <small>
+                  Số lượng hiện có sau khi lưu, không cộng thêm vào tồn kho cũ.
+                </small>
+              </label>
+            </fieldset>
+            <div className="form-footer">
+              <button
+                type="button"
+                className="button secondary"
+                disabled={editBusy}
+                onClick={() => setEditing(null)}
+              >
+                Hủy
+              </button>
+              <button className="button primary" disabled={editBusy}>
+                <Save size={16} />
+                {editBusy ? "Đang lưu…" : "Lưu thay đổi"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </>
   );
 }
