@@ -1,0 +1,22 @@
+# MySQL Standby riêng trên Docker Desktop Windows; chưa cấu hình replication.
+name: omdrs-standby-windows
+services:
+  mysql-standby:
+    image: mysql:8.4.13
+    environment:
+      MYSQL_ROOT_PASSWORD: ${STANDBY_ROOT_PASSWORD:?Set a dedicated standby root password}
+    ports:
+      - "127.0.0.1:3307:3306"
+    command:
+      - --server-id=2
+      - --log-bin=mysql-bin
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-replica-updates=ON
+      - --skip-replica-start=ON
+      - --event-scheduler=OFF
+    volumes:
+      - standby_windows_data:/var/lib/mysql
+      - ./mysql/init-standby-guard.sql:/docker-entrypoint-initdb.d/01-standby-guard.sql:ro
+volumes:
+  standby_windows_data:
