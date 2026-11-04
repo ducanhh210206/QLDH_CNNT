@@ -1,0 +1,4 @@
+# Backup samples are checksummed byte-for-byte; never convert their line endings.
+DATABASE_TEST/03_TAO_BACKUP/backup-mau-du-lieu-gia.sql -text whitespace=-blank-at-eol
+DATABASE_TEST/04_THU_KHOI_PHUC/backup-du-lieu-gia.sql -text whitespace=-blank-at-eol
+docs/evidence/restore/**/backup-du-lieu-gia.sql -text whitespace=-blank-at-eol
