@@ -802,7 +802,8 @@ td strong {
   overflow: auto;
 }
 .bar-col {
-  min-width: 20px;
+  min-width: 36px;
+  flex-shrink: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -818,9 +819,10 @@ td strong {
   color: var(--muted);
 }
 .bar-col small {
-  font-size: 8px;
+  font-size: 9px;
   color: var(--muted);
-  writing-mode: vertical-rl;
+  writing-mode: horizontal-tb;
+  white-space: nowrap;
 }
 .distribution {
   padding: 22px;
