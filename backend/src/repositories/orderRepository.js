@@ -38,9 +38,10 @@ export async function list(q) {
 }
 export async function create(data, userId, key) {
   const hash = createHash("sha256").update(JSON.stringify(data)).digest("hex");
-  const replay = async () => {
-    const [r] = await pool.execute(
-      "SELECT request_hash,order_id FROM idempotency_keys WHERE user_id=? AND idem_key=?",
+  const replay = async (c = pool, lock = false) => {
+    const [r] = await c.execute(
+      "SELECT request_hash,order_id FROM idempotency_keys WHERE user_id=? AND idem_key=?" +
+        (lock ? " FOR UPDATE" : ""),
       [userId, key],
     );
     if (!r[0]) return null;
@@ -50,24 +51,55 @@ export async function create(data, userId, key) {
         "IDEMPOTENCY_CONFLICT",
         "Khóa yêu cầu đã được dùng với nội dung khác.",
       );
-    return { order: await get(r[0].order_id), replayed: true };
+    return { order: await get(r[0].order_id, c), replayed: true };
   };
   const existing = await replay();
   if (existing) return existing;
   try {
     return await transaction(async (c) => {
+      const [products] = await c.execute(
+        "SELECT * FROM products WHERE id=? FOR UPDATE",
+        [data.product_id],
+      );
+      const product = products[0];
+      if (!product)
+        fail(
+          404,
+          "PRODUCT_NOT_FOUND",
+          "Sản phẩm không còn trong danh mục. Hãy chọn lại.",
+        );
+      const repeated = await replay(c);
+      if (repeated) return repeated;
+      if (data.quantity > Number(product.stock_quantity))
+        fail(
+          409,
+          "INSUFFICIENT_STOCK",
+          "Không đủ hàng. Sản phẩm " +
+            product.name +
+            " chỉ còn " +
+            product.stock_quantity +
+            ", bạn đặt " +
+            data.quantity +
+            ".",
+        );
       const id = randomUUID();
       await c.execute(
-        "INSERT INTO orders(id,customer_name,product_name,quantity,total_amount,status) VALUES(?,?,?,?,?,?)",
+        "INSERT INTO orders(id,product_id,customer_name,product_name,quantity,total_amount,status) VALUES(?,?,?,?,?,?,?)",
         [
           id,
+          product.id,
           data.customer_name,
-          data.product_name,
+          product.name,
           data.quantity,
           data.total_amount,
           data.status,
         ],
       );
+      if (data.status !== "Cancelled")
+        await c.execute(
+          "UPDATE products SET stock_quantity=stock_quantity-? WHERE id=?",
+          [data.quantity, product.id],
+        );
       await c.execute(
         "INSERT INTO idempotency_keys(user_id,idem_key,request_hash,order_id) VALUES(?,?,?,?)",
         [userId, key, hash, id],
@@ -107,6 +139,11 @@ export async function updateStatus(id, status, version, userId) {
     const old = r[0];
     if (!old) fail(404, "NOT_FOUND", "Không tìm thấy đơn hàng.");
     assertTransition(old, status, version);
+    if (status === "Cancelled" && old.product_id)
+      await c.execute(
+        "UPDATE products SET stock_quantity=stock_quantity+? WHERE id=?",
+        [old.quantity, old.product_id],
+      );
     await c.execute(
       "UPDATE orders SET status=?,version=version+1,updated_at=UTC_TIMESTAMP(3) WHERE id=? AND version=?",
       [status, id, version],

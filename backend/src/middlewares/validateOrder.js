@@ -3,6 +3,7 @@ import { fail } from "../utils/errors.js";
 export const statuses = ["Pending", "Completed", "Cancelled"];
 export const orderSchema = z
   .object({
+    product_id: z.uuid(),
     customer_name: z.string().trim().min(1).max(200),
     product_name: z.string().trim().min(1).max(200),
     quantity: z.number().int().min(1).max(1000000),

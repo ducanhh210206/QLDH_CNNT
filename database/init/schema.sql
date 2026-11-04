@@ -70,3 +70,7 @@ CREATE TABLE notification_reads (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 
 INSERT INTO schema_migrations(version) VALUES ('003_notifications');
+
+ALTER TABLE products ADD COLUMN stock_quantity BIGINT UNSIGNED NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN product_id CHAR(36) NULL;
+INSERT INTO schema_migrations(version) VALUES ('004_product_stock');

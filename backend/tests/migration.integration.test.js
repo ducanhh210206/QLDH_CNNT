@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 test(
-  "migrations 002/003 keep existing users/orders and are safely repeatable",
+  "migrations 002/003/004 keep existing users/orders and are safely repeatable",
   { skip: !process.env.RUN_DB_INTEGRATION },
   async () => {
     const { env, directDatabaseConfig } = await import("../src/config/env.js");
@@ -55,6 +55,7 @@ test(
       const [orders] = await c.query("SELECT * FROM orders");
       assert.equal(orders.length, 1);
       assert.equal(orders[0].id, oid);
+      assert.equal(orders[0].product_id, null);
       assert.equal(orders[0].total_amount, "10.50");
       const [versions] = await c.query(
         "SELECT version FROM schema_migrations WHERE version='002_user_access'",
@@ -68,6 +69,18 @@ test(
         "SELECT version FROM schema_migrations WHERE version='003_notifications'",
       );
       assert.equal(notificationVersion.length, 1);
+      const [stockVersion] = await c.query(
+        "SELECT version FROM schema_migrations WHERE version='004_product_stock'",
+      );
+      assert.equal(stockVersion.length, 1);
+      await c.execute(
+        "INSERT INTO products(id,sku,name,unit_price,created_by) VALUES(?,'LEGACY-TEST','Legacy',1,?)",
+        [randomUUID(), uid],
+      );
+      const [[stock]] = await c.query(
+        "SELECT stock_quantity FROM products WHERE sku='LEGACY-TEST'",
+      );
+      assert.equal(Number(stock.stock_quantity), 0);
       console.log("Migration test schema retained: " + name);
     } finally {
       await c.end();

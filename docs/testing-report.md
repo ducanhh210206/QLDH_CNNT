@@ -112,3 +112,11 @@ Lý do SKIP: Docker Engine không phản hồi qua socket khi kiểm tra có quy
 - Backup/restore xác minh cả bản mới 13 bảng và bản cũ 12 bảng không có notification_reads.
 - Build FE production thành công. Đã thử bằng tài khoản kiểm thử: mở chuông, số chưa đọc, đọc từng mục, đọc tất cả và chuyển sang trang đơn hàng.
 - [Ảnh giao diện với dữ liệu kiểm thử](notifications-preview.png). Kết quả này không tự xác nhận bản mới đã được triển khai trên Render.
+
+## 04/11/2026 — Tồn kho sản phẩm
+
+- 42/42 kiểm thử đạt trên MySQL Docker cách ly, không bỏ qua kiểm thử tích hợp; FE production build thành công.
+- Kiểm chứng không bán vượt kho khi đặt đồng thời, gửi cùng khóa khi vừa hết kho vẫn nhận lại đơn, hủy lặp không hoàn hai lần, hoàn tất không trừ thêm, tạo Cancelled không trừ kho và lỗi FK cuối transaction rollback cả đơn/tồn.
+- Kiểm tra quyền nhập kho, số lượng sai, sản phẩm không tồn tại, tên sản phẩm lấy từ danh mục và đơn cũ không tự hoàn kho.
+- Migration 002/003/004 chạy lại được, giữ tài khoản và đơn cũ; backup/restore vẫn xác minh đủ 13 bảng và nhận bản cũ 12 bảng.
+- Đã thử giao diện với dữ liệu riêng: đặt 3 khi kho có 2 bị khóa lưu, đặt đúng 2 thành công và tồn về 0; nhập thêm 3 hiển thị tồn 3.

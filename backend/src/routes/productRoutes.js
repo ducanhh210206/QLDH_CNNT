@@ -8,3 +8,9 @@ productRoutes.get("/", permission("products.read"), async (req, res) =>
 productRoutes.post("/", permission("products.create"), async (req, res) =>
   res.status(201).json(await svc.create(req.body, req.user.id)),
 );
+
+productRoutes.post(
+  "/:id/stock",
+  permission("products.create"),
+  async (req, res) => res.json(await svc.addStock(req.params.id, req.body)),
+);

@@ -9,6 +9,7 @@ import { assertTransition } from "../src/repositories/orderRepository.js";
 import { compareOrders, digest } from "../src/utils/integrity.js";
 import { hashPassword, verifyPassword } from "../src/services/authService.js";
 const valid = {
+  product_id: "550e8400-e29b-41d4-a716-446655440000",
   customer_name: " Nguyễn An ",
   product_name: "Sản phẩm",
   quantity: 2,
@@ -22,6 +23,8 @@ test("order: trim, default Pending, preserve decimal", () => {
 });
 test("order: reject invalid business data", () => {
   for (const patch of [
+    { product_id: undefined },
+    { product_id: "invalid" },
     { quantity: 0 },
     { quantity: 1.5 },
     { total_amount: -1 },

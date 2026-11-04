@@ -52,7 +52,13 @@ test(
         ).status,
         200,
       );
+      const pid = randomUUID();
+      await c.execute(
+        "INSERT INTO products(id,sku,name,unit_price,stock_quantity,created_by) SELECT ?, 'BASE-TEST','Product',1200.50,100,id FROM users WHERE username='Admin'",
+        [pid],
+      );
       const body = {
+        product_id: pid,
         customer_name: "Test",
         product_name: "Product",
         quantity: 1,
@@ -242,6 +248,7 @@ test(
       assert.equal(Number(receiptCount.total), 1);
       const product = await adminAgent.post("/api/products").send({
         sku: "SP-TEST",
+        stock_quantity: 10,
         name: "Sản phẩm thử nghiệm",
         unit_price: "1200.50",
         description: "Isolated test",
@@ -378,12 +385,10 @@ test(
         "INSERT INTO backup_records(id,file_name,status,sha256) VALUES(?,?,'Success',?)",
         [legacyId, legacyId + ".sql", legacyManifest.sha256],
       );
-      const legacyRestored = await adminAgent
-        .post("/api/admin/restores")
-        .send({
-          backup_id: legacyId,
-          confirmation: "RESTORE_TO_ISOLATED_DATABASE",
-        });
+      const legacyRestored = await adminAgent.post("/api/admin/restores").send({
+        backup_id: legacyId,
+        confirmation: "RESTORE_TO_ISOLATED_DATABASE",
+      });
       assert.equal(
         legacyRestored.status,
         201,

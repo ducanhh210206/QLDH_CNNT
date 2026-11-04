@@ -252,3 +252,11 @@ Khi BE chạy Docker, backup runtime nằm trong named volume gắn tại /app/d
 | frontend/src/components/NotificationCenter.jsx | Chuông, số chưa đọc, danh sách phân trang và thao tác đọc. |
 | backend/tests/notifications.test.js | Kiểm tra xác thực, phân quyền, phân trang và bảo vệ trạng thái đọc. |
 | docs/notifications.md | Hướng dẫn dùng và nâng cấp database. |
+
+## Tồn kho sản phẩm
+
+| File | Công dụng |
+|---|---|
+| database/migrations/004_product_stock.sql | Thêm stock_quantity cho sản phẩm và product_id cho đơn mới; giữ đơn cũ chưa liên kết. |
+| backend/tests/inventory.integration.test.js | Kiểm thử MySQL thật về thiếu hàng, đặt đồng thời, gửi lại, hoàn kho và rollback. |
+| docs/product-stock.md | Quy tắc tồn kho, API và hướng dẫn nâng cấp. |

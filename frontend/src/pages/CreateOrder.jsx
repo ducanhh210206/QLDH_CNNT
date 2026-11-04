@@ -3,6 +3,7 @@ import { Save, ShieldCheck, ArrowLeft, Info } from "lucide-react";
 import { api, money } from "../services/api";
 import { PageHeading, Panel, ErrorBox, useData } from "../components/common";
 const blank = {
+  product_id: "",
   customer_name: "",
   product_name: "",
   quantity: 1,
@@ -13,12 +14,15 @@ import { can } from "../utils/permissions";
 export default function CreateOrder({ notify, navigate, user }) {
   const draftKey = "omdrs-draft:" + user.id,
     pendingKey = "omdrs-pending:" + user.id;
+  const [productSearch, setProductSearch] = useState("");
   const products = useData(
-    can(user, "products.read") ? "/api/products?limit=100" : null,
+    "/api/orders/products?limit=100&search=" +
+      encodeURIComponent(productSearch),
+    15000,
   );
   const [form, setForm] = useState(() => {
       try {
-        return JSON.parse(localStorage.getItem(draftKey)) || blank;
+        return { ...blank, ...JSON.parse(localStorage.getItem(draftKey)) };
       } catch {
         return blank;
       }
@@ -32,8 +36,28 @@ export default function CreateOrder({ notify, navigate, user }) {
     }),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const selected = products.data?.data.find((p) => p.id === form.product_id);
+  const insufficient =
+    selected && Number(form.quantity) > Number(selected.stock_quantity);
+  function selectProduct(e) {
+    const item = products.data?.data.find((p) => p.id === e.target.value);
+    const next = {
+      ...form,
+      product_id: item?.id || "",
+      product_name: item?.name || "",
+      total_amount: item
+        ? (Number(item.unit_price) * Number(form.quantity || 1)).toFixed(2)
+        : "",
+    };
+    setForm(next);
+    localStorage.setItem(draftKey, JSON.stringify(next));
+  }
   function change(e) {
     const next = { ...form, [e.target.name]: e.target.value };
+    if (e.target.name === "quantity" && selected)
+      next.total_amount = (
+        Number(selected.unit_price) * Number(e.target.value || 0)
+      ).toFixed(2);
     setForm(next);
     localStorage.setItem(draftKey, JSON.stringify(next));
   }
@@ -42,6 +66,7 @@ export default function CreateOrder({ notify, navigate, user }) {
     if (busy) return;
     const body = pending?.body || { ...form, quantity: Number(form.quantity) };
     if (
+      !body.product_id ||
       !body.customer_name.trim() ||
       !body.product_name.trim() ||
       !Number.isInteger(body.quantity) ||
@@ -49,7 +74,13 @@ export default function CreateOrder({ notify, navigate, user }) {
       !/^\d{1,12}(\.\d{1,2})?$/.test(String(body.total_amount))
     ) {
       setError(
-        "Kiểm tra tên, số lượng nguyên dương và tổng tiền không âm (tối đa 2 chữ số thập phân).",
+        "Chọn sản phẩm trong danh mục; kiểm tra tên, số lượng nguyên dương và tổng tiền không âm (tối đa 2 chữ số thập phân).",
+      );
+      return;
+    }
+    if (!pending && insufficient) {
+      setError(
+        "Không đủ hàng. Sản phẩm chỉ còn " + selected.stock_quantity + ".",
       );
       return;
     }
@@ -71,9 +102,11 @@ export default function CreateOrder({ notify, navigate, user }) {
       notify(
         "Đã lưu đơn #" + r.order.id.slice(0, 8).toUpperCase() + " vào MySQL.",
       );
+      products.reload();
       navigate("orders");
     } catch (e) {
       setError(e.message);
+      products.reload();
       if (!e.uncertain) {
         localStorage.removeItem(pendingKey);
         setPending(null);
@@ -114,47 +147,54 @@ export default function CreateOrder({ notify, navigate, user }) {
                   placeholder="Ví dụ: Nguyễn Minh Anh"
                 />
               </label>
-              {products.data?.data.length > 0 && (
-                <label>
-                  Chọn nhanh từ danh mục
-                  <select
-                    defaultValue=""
-                    onChange={(e) => {
-                      const item = products.data.data.find(
-                        (p) => p.id === e.target.value,
-                      );
-                      if (!item) return;
-                      const next = {
-                        ...form,
-                        product_name: item.name,
-                        total_amount: (
-                          Number(item.unit_price) * Number(form.quantity || 1)
-                        ).toFixed(2),
-                      };
-                      setForm(next);
-                      localStorage.setItem(draftKey, JSON.stringify(next));
-                    }}
-                  >
-                    <option value="">Chọn sản phẩm (tùy chọn)</option>
-                    {products.data.data.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.sku} · {p.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              )}
               <label>
-                Tên sản phẩm *
+                Tìm sản phẩm trong danh mục
                 <input
-                  name="product_name"
-                  value={form.product_name}
-                  onChange={change}
-                  required
-                  maxLength={200}
-                  placeholder="Nhập tên sản phẩm"
+                  value={productSearch}
+                  onChange={(e) => setProductSearch(e.target.value)}
+                  placeholder="Tìm theo mã hoặc tên sản phẩm…"
                 />
               </label>
+              <ErrorBox error={products.error} retry={products.reload} />
+              <label>
+                Sản phẩm *
+                <select
+                  name="product_id"
+                  value={form.product_id || ""}
+                  onChange={selectProduct}
+                  required
+                >
+                  <option value="">
+                    {products.loading ? "Đang tải danh mục…" : "Chọn sản phẩm"}
+                  </option>
+                  {form.product_id && !selected && (
+                    <option value={form.product_id}>
+                      {form.product_name} · Chọn lại để kiểm tra tồn kho
+                    </option>
+                  )}
+                  {products.data?.data.map((p) => (
+                    <option
+                      key={p.id}
+                      value={p.id}
+                      disabled={Number(p.stock_quantity) === 0}
+                    >
+                      {p.sku} · {p.name} · Còn {p.stock_quantity}
+                    </option>
+                  ))}
+                </select>
+                {selected && (
+                  <small>
+                    Tồn kho: {selected.stock_quantity}. Đơn đang chờ cũng được
+                    trừ tồn kho.
+                  </small>
+                )}
+              </label>
+              {insufficient && (
+                <div className="notice" role="alert">
+                  Không đủ hàng: chỉ còn {selected.stock_quantity}, bạn đang đặt{" "}
+                  {form.quantity}.
+                </div>
+              )}
               <div className="two-fields">
                 <label>
                   Số lượng *
@@ -206,7 +246,10 @@ export default function CreateOrder({ notify, navigate, user }) {
                 <ArrowLeft size={16} />
                 Danh sách đơn
               </button>
-              <button className="button primary" disabled={busy}>
+              <button
+                className="button primary"
+                disabled={busy || (!pending && !!insufficient)}
+              >
                 <Save size={16} />
                 {busy
                   ? "Đang gửi…"
@@ -245,7 +288,10 @@ export default function CreateOrder({ notify, navigate, user }) {
               Chỉ xác nhận thành công khi MySQL đã ghi nhận. Bản nháp được giữ
               trên trình duyệt nếu mất kết nối.
             </p>
-            <p>Đơn đã hoàn tất hoặc hủy sẽ không thể đổi về đang chờ.</p>
+            <p>
+              Chỉ tạo đơn khi đủ tồn kho. Hủy đơn đang chờ sẽ hoàn lại số lượng
+              vào kho. Đơn đã hoàn tất hoặc hủy không thể đổi về đang chờ.
+            </p>
           </div>
         </aside>
       </div>

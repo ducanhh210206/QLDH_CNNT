@@ -199,6 +199,7 @@ test("product validation preserves decimal values and rejects malformed SKU", ()
       sku: "sp-1",
       name: "Sản phẩm",
       unit_price: "1200.50",
+      stock_quantity: 10,
     }).sku,
     "SP-1",
   );

@@ -16,12 +16,16 @@ try {
     throw Error("Không lấy được khóa migration/backup.");
   locked = true;
   const [versions] = await c.query("SELECT version FROM schema_migrations");
-  const migrations = ["002_user_access", "003_notifications"];
+  const migrations = [
+    "002_user_access",
+    "003_notifications",
+    "004_product_stock",
+  ];
   const pending = migrations.filter(
     (version) => !versions.some((row) => row.version === version),
   );
   if (!pending.length) {
-    console.log("Schema hiện tại đã được áp dụng (002 và 003).");
+    console.log("Schema hiện tại đã được áp dụng (002, 003 và 004).");
   } else {
     if (!versions.some((r) => r.version === "001_initial"))
       throw Error("Cần schema 001 trước.");
@@ -82,11 +86,11 @@ try {
         .map((s) => s.trim())
         .filter(Boolean);
       for (const statement of statements) {
-        const add = statement.match(/^ALTER TABLE users ADD COLUMN (\w+)/);
+        const add = statement.match(/^ALTER TABLE (\w+) ADD COLUMN (\w+)/);
         if (add) {
           const [existing] = await c.execute(
             "SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME=?",
-            [env.db.database, "users", add[1]],
+            [env.db.database, add[1], add[2]],
           );
           if (existing.length) continue;
         }

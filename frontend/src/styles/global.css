@@ -1979,3 +1979,5 @@ textarea:focus{outline:2px solid #087e7233;border-color:var(--teal)}
 .notifications-pagination { font-size:10px; }
 .notifications-footer,.notifications-empty { margin:0; padding:16px 18px; font-size:10px; color:var(--muted); line-height:1.8; }
 .notifications-panel button:disabled { opacity:.45; cursor:default; }
+
+.stock-form{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:100px;width:105px}.stock-form input{width:100%;margin:0}.stock-form .button{white-space:nowrap;justify-content:center;padding:8px 10px}

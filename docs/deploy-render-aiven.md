@@ -44,7 +44,7 @@ Sau khi xác nhận đúng database cloud mới/rỗng:
 CONFIRM_EMPTY_DATABASE=order_management node --env-file=backend/.env.hosting scripts/init-db.js
 ```
 
-Mong đợi: `Schema 001, 002 và 003 đã được áp dụng.` Nếu có bảng, script sẽ từ chối; không xóa dữ liệu để chạy lại. Database cloud đã có bản cũ dùng migration phù hợp, không dùng init.
+Mong đợi: `Schema 001, 002, 003 và 004 đã được áp dụng.` Nếu có bảng, script sẽ từ chối; không xóa dữ liệu để chạy lại. Database cloud đã có bản cũ dùng migration phù hợp, không dùng init.
 
 Tạo Quản lý website trên cloud (khác tài khoản MySQL):
 
@@ -103,7 +103,7 @@ Không dùng backend/Dockerfile hoặc frontend/Dockerfile cho hướng dẫn n�
 - Tạo sản phẩm/đơn, cấp tài khoản, thử đăng nhập nhân viên.
 - Tắt website/Docker trên Mac rồi mở URL cloud từ máy khác để kiểm chứng không phụ thuộc máy cá nhân.
 
-Nếu lỗi, chỉ chia sẻ mã lỗi hoặc log đã che credential. 403 khi đăng nhập thường cần kiểm tra CORS_ORIGINS có giá trị localhost cũ không. 503 readiness: kiểm tra schema 003, host/port/password/CA Aiven và JWT. Lỗi chứng chỉ: dùng đúng CA và hostname Aiven; không tắt kiểm tra TLS. Render có thể yêu cầu xác minh tài khoản tùy trường hợp; không chọn nâng cấp trả phí để ép triển khai.
+Nếu lỗi, chỉ chia sẻ mã lỗi hoặc log đã che credential. 403 khi đăng nhập thường cần kiểm tra CORS_ORIGINS có giá trị localhost cũ không. 503 readiness: kiểm tra schema 004, host/port/password/CA Aiven và JWT. Lỗi chứng chỉ: dùng đúng CA và hostname Aiven; không tắt kiểm tra TLS. Render có thể yêu cầu xác minh tài khoản tùy trường hợp; không chọn nâng cấp trả phí để ép triển khai.
 
 ## 5. Bật Google trên URL cloud
 
@@ -138,3 +138,5 @@ Tài liệu nhà cung cấp (kiểm tra ngày 02/11/2026):
 ### Cập nhật bản có thông báo
 
 Database Aiven đã có dữ liệu: chạy `node --env-file=backend/.env.hosting scripts/migrate-db.js` từ máy có file cấu hình riêng và CA hợp lệ trước khi triển khai BE mới. Không chạy lại init. Lệnh tạo snapshot bảo vệ trước DDL và bổ sung bảng `notification_reads`. Trên Render chọn **Manual Deploy → Deploy latest commit** nếu dịch vụ không tự triển khai sau khi push. Secret và chứng chỉ tiếp tục cấu hình trên Render, không đưa `.env.hosting` lên Git.
+
+Bản tồn kho yêu cầu migration **004_product_stock** trước khi deploy BE mới. Sản phẩm hiện có khởi tạo tồn kho 0, người quản lý nhập lại số lượng thực tế sau khi kiểm kê; xem [tồn kho](product-stock.md).
