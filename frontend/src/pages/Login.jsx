@@ -7,6 +7,8 @@ import {
   Database,
   ArrowRight,
   Clock3,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { api } from "../services/api";
 import { ErrorBox, useData } from "../components/common";
@@ -23,6 +25,7 @@ const resultMessages = {
 };
 export default function Login({ onLogin }) {
   const [mode, setMode] = useState("login"),
+    [showPassword, setShowPassword] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [message, setMessage] = useState(
@@ -79,6 +82,7 @@ export default function Login({ onLogin }) {
   }
   function switchMode(next) {
     setMode(next);
+    setShowPassword(false);
     setError("");
     setMessage("");
   }
@@ -219,21 +223,35 @@ export default function Login({ onLogin }) {
                   }
                 />
               </label>
-              <label>
+              <label htmlFor="auth-password">
                 Mật khẩu
-                <input
-                  name="password"
-                  type="password"
-                  required
-                  minLength={mode === "register" ? 12 : 1}
-                  maxLength={256}
-                  autoComplete={
-                    mode === "register" ? "new-password" : "current-password"
-                  }
-                  placeholder={
-                    mode === "register" ? "Tối thiểu 12 ký tự" : "Nhập mật khẩu"
-                  }
-                />
+                <span className="password-field">
+                  <input
+                    id="auth-password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    required
+                    minLength={mode === "register" ? 12 : 1}
+                    maxLength={256}
+                    autoComplete={
+                      mode === "register" ? "new-password" : "current-password"
+                    }
+                    placeholder={
+                      mode === "register" ? "Tối thiểu 12 ký tự" : "Nhập mật khẩu"
+                    }
+                  />
+                  <button
+                    type="button"
+                    className="password-toggle"
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    aria-pressed={showPassword}
+                    aria-controls="auth-password"
+                    title={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    onClick={() => setShowPassword((value) => !value)}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </span>
               </label>
               {mode === "register" && (
                 <label>
