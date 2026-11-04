@@ -84,7 +84,7 @@ export default function Products({ user, notify }) {
     setBusy(true);
     setError("");
     try {
-      await api("/api/products", {
+      const created = await api("/api/products", {
         method: "POST",
         body: JSON.stringify({
           ...body,
@@ -93,7 +93,7 @@ export default function Products({ user, notify }) {
       });
       form.reset();
       list.reload();
-      notify("Đã thêm sản phẩm vào danh mục.");
+      notify("Đã thêm sản phẩm " + created.sku + " vào danh mục.");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -211,22 +211,15 @@ export default function Products({ user, notify }) {
         {can(user, "products.create") && (
           <Panel
             title="Thêm sản phẩm"
-            subtitle="Mã sản phẩm là duy nhất"
+            subtitle="Mã sản phẩm được tạo tự động khi lưu"
             action={<PackagePlus size={20} />}
           >
             <form className="order-form" onSubmit={submit}>
               <ErrorBox error={error} />
               <fieldset disabled={busy}>
-                <label>
-                  Mã sản phẩm
-                  <input
-                    name="sku"
-                    required
-                    maxLength={64}
-                    pattern="[A-Za-z0-9._\-]+"
-                    placeholder="Ví dụ: SP-001"
-                  />
-                </label>
+                <p className="product-code-hint">
+                  Mã sản phẩm: <strong>Tự động tạo</strong>
+                </p>
                 <label>
                   Tên sản phẩm
                   <input

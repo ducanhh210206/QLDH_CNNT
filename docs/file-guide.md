@@ -262,3 +262,5 @@ Khi BE chạy Docker, backup runtime nằm trong named volume gắn tại /app/d
 | docs/product-stock.md | Quy tắc tồn kho, API và hướng dẫn nâng cấp. |
 
 Migration `database/migrations/005_product_edit.sql` thêm phiên bản sản phẩm để sửa tên, giá và tồn kho có kiểm tra thay đổi đồng thời.
+
+`backend/tests/product-code.test.js` kiểm tra mã sản phẩm tự sinh và xử lý trùng mã có giới hạn.

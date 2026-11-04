@@ -735,3 +735,7 @@ Database cũ chạy `npm run db:migrate` để bổ sung schema **004_product_st
 ### Chỉnh sửa sản phẩm
 
 Bấm **Sửa** tại dòng sản phẩm để thay đổi tên, giá bán và số lượng tồn kho, sau đó **Lưu thay đổi**. Số lượng là giá trị tồn mới (ví dụ tồn 10, sửa thành 7 thì kho còn 7), không cộng thêm. Đơn hàng đã tạo giữ nguyên tên và số tiền lịch sử. Database cũ cần `npm run db:migrate` bổ sung **005_product_edit** trước khi chạy BE mới. Nếu sản phẩm/tồn kho đã thay đổi trong lúc mở cửa sổ sửa, hệ thống từ chối ghi đè và yêu cầu mở lại thông tin mới.
+
+### Mã sản phẩm tự sinh
+
+Khi thêm sản phẩm không cần nhập mã. Backend tự tạo mã dạng `SP-` + 12 ký tự chữ/số (ví dụ `SP-6F2A183B9C40`), kiểm tra duy nhất bằng ràng buộc database và tự tạo lại nếu trùng. Thông báo thành công và bảng danh mục hiển thị mã vừa tạo. Mã các sản phẩm cũ giữ nguyên; sửa sản phẩm không đổi mã. Không cần migration mới.

@@ -1983,3 +1983,5 @@ textarea:focus{outline:2px solid #087e7233;border-color:var(--teal)}
 .stock-form{display:flex;flex-direction:column;align-items:stretch;gap:6px;min-width:100px;width:105px}.stock-form input{width:100%;margin:0}.stock-form .button{white-space:nowrap;justify-content:center;padding:8px 10px}
 
 .product-edit-form{padding:24px}.product-edit-form>p{margin-top:0;margin-bottom:20px}.product-edit-form small{display:block;margin-top:8px;color:var(--muted);font-weight:400}
+
+.product-code-hint{font-size:11px;color:var(--muted);margin:0 0 20px;padding:12px;background:var(--soft);border-radius:8px}.product-code-hint strong{color:var(--text)}

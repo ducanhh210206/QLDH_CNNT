@@ -56,12 +56,22 @@ test(
           200,
         );
       const product = await manager.post("/api/products").send({
-        sku: "STOCK-1",
         name: "Hàng tồn kho",
         unit_price: "100.50",
         stock_quantity: 5,
       });
       assert.equal(product.status, 201, JSON.stringify(product.body));
+      assert.match(product.body.sku, /^SP-[A-F0-9]{12}$/);
+      const another = await manager
+        .post("/api/products")
+        .send({
+          sku: product.body.sku,
+          name: "Tên trùng vẫn có mã riêng",
+          unit_price: "1",
+          stock_quantity: 0,
+        });
+      assert.equal(another.status, 201);
+      assert.notEqual(another.body.sku, product.body.sku);
       const pid = product.body.id;
       const stock = async () =>
         Number(

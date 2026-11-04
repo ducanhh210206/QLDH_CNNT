@@ -22,27 +22,37 @@ export async function list(q) {
   };
 }
 export async function create(data, userId) {
-  const id = randomUUID();
-  try {
-    await pool.execute(
-      "INSERT INTO products(id,sku,name,unit_price,description,created_by,stock_quantity) VALUES(?,?,?,?,?,?,?)",
-      [
-        id,
-        data.sku,
-        data.name,
-        data.unit_price,
-        data.description,
-        userId,
-        data.stock_quantity,
-      ],
-    );
-  } catch (e) {
-    if (e.code === "ER_DUP_ENTRY")
-      fail(409, "SKU_EXISTS", "Mã sản phẩm đã tồn tại.");
-    throw e;
+  // Generate on the server; ignore legacy caller-supplied SKUs.
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const id = randomUUID();
+    const sku = "SP-" + id.replaceAll("-", "").slice(0, 12).toUpperCase();
+    try {
+      await pool.execute(
+        "INSERT INTO products(id,sku,name,unit_price,description,created_by,stock_quantity) VALUES(?,?,?,?,?,?,?)",
+        [
+          id,
+          sku,
+          data.name,
+          data.unit_price,
+          data.description,
+          userId,
+          data.stock_quantity,
+        ],
+      );
+    } catch (e) {
+      if (e.code === "ER_DUP_ENTRY") continue;
+      throw e;
+    }
+    const [rows] = await pool.execute("SELECT * FROM products WHERE id=?", [
+      id,
+    ]);
+    return rows[0];
   }
-  const [rows] = await pool.execute("SELECT * FROM products WHERE id=?", [id]);
-  return rows[0];
+  fail(
+    503,
+    "SKU_GENERATION_FAILED",
+    "Chưa tạo được mã sản phẩm duy nhất. Vui lòng thử lại.",
+  );
 }
 
 export async function addStock(id, quantity) {

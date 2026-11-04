@@ -9,7 +9,8 @@ export const productSchema = z
       .min(1)
       .max(64)
       .regex(/^[A-Za-z0-9._-]+$/)
-      .transform((s) => s.toUpperCase()),
+      .transform((s) => s.toUpperCase())
+      .optional(),
     name: z.string().trim().min(1).max(200),
     unit_price: orderSchema.shape.total_amount,
     stock_quantity: z.number().int().min(0).max(1000000000),
