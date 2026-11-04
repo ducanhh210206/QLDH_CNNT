@@ -1,6 +1,6 @@
 export const permissionLabels = {
   "products.read": "Xem sản phẩm",
-  "products.create": "Thêm / sửa sản phẩm và nhập kho",
+  "products.create": "Thêm / sửa / xoá sản phẩm và nhập kho",
   "orders.read": "Xem đơn hàng",
   "orders.create": "Tạo đơn hàng",
   "orders.update": "Cập nhật trạng thái đơn",

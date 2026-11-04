@@ -330,6 +330,40 @@ test(
       const expected =
         race[1].status === 200 ? 5 : Number(stale.stock_quantity) - 1;
       assert.equal(await stock(), expected);
+      const deletePath = "/api/products/" + another.body.id;
+      assert.equal((await staff.delete(deletePath).send({ version: 1 })).status, 403);
+      assert.equal((await manager.delete(deletePath).send({})).status, 400);
+      assert.equal((await manager.delete(deletePath).send({ version: 2 })).status, 409);
+      assert.equal((await manager.delete(deletePath).send({ version: 1 })).status, 204);
+      assert.equal((await manager.delete(deletePath).send({ version: 1 })).status, 404);
+      const usedVersion = (await currentProduct()).version;
+      const used = await manager.delete("/api/products/" + pid).send({ version: usedVersion });
+      assert.equal(used.status, 409);
+      assert.equal(used.body.error.code, "PRODUCT_IN_USE");
+      assert.equal(await stock(), expected);
+      const cancellable = await manager.post("/api/products").send({
+        name: "Sản phẩm có đơn huỷ", unit_price: "10", stock_quantity: 5,
+      });
+      assert.equal(cancellable.status, 201);
+      assert.equal((await submit(1, randomUUID(), "Cancelled", cancellable.body.id)).status, 201);
+      assert.equal((await manager.delete("/api/products/" + cancellable.body.id).send({ version: 1 })).body.error.code, "PRODUCT_IN_USE");
+      const raceProduct = await manager.post("/api/products").send({
+        name: "Sản phẩm thử xoá đồng thời", unit_price: "10", stock_quantity: 5,
+      });
+      assert.equal(raceProduct.status, 201);
+      const [removed, orderRace] = await Promise.all([
+        manager.delete("/api/products/" + raceProduct.body.id).send({ version: 1 }),
+        submit(1, randomUUID(), "Pending", raceProduct.body.id),
+      ]);
+      assert.ok(
+        (removed.status === 204 && orderRace.status === 404) ||
+        (removed.status === 409 && orderRace.status === 201),
+        JSON.stringify({ delete: removed.status, order: orderRace.status }),
+      );
+      const [orphaned] = await c.execute(
+        "SELECT o.id FROM orders o LEFT JOIN products p ON p.id=o.product_id WHERE o.product_id IS NOT NULL AND p.id IS NULL",
+      );
+      assert.equal(orphaned.length, 0);
       console.log("Inventory integration checks passed in isolated schema.");
     } finally {
       await c.end();

@@ -1,4 +1,4 @@
-import { pool } from "../config/database.js";
+import { pool, transaction } from "../config/database.js";
 import { randomUUID } from "node:crypto";
 import { fail } from "../utils/errors.js";
 export async function list(q) {
@@ -80,4 +80,24 @@ export async function update(id, data) {
       "Sản phẩm hoặc tồn kho đã thay đổi. Hãy bấm Sửa lại để tải thông tin mới trước khi lưu.",
     );
   return rows[0];
+}
+
+export async function remove(id, version) {
+  return transaction(async (c) => {
+    // Order creation takes the same lock before inserting its product reference.
+    const [rows] = await c.execute(
+      "SELECT version FROM products WHERE id=? FOR UPDATE",
+      [id],
+    );
+    if (!rows.length) fail(404, "PRODUCT_NOT_FOUND", "Không tìm thấy sản phẩm.");
+    if (rows[0].version !== version)
+      fail(409, "PRODUCT_VERSION_CONFLICT", "Sản phẩm hoặc tồn kho đã thay đổi. Hãy làm mới danh mục trước khi xoá.");
+    const [orders] = await c.execute(
+      "SELECT id FROM orders WHERE product_id=? LIMIT 1 FOR UPDATE",
+      [id],
+    );
+    if (orders.length)
+      fail(409, "PRODUCT_IN_USE", "Không thể xoá sản phẩm đã có trong đơn hàng, kể cả đơn đã huỷ, để giữ lịch sử giao dịch.");
+    await c.execute("DELETE FROM products WHERE id=?", [id]);
+  });
 }

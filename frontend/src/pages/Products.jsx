@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Save,
   Pencil,
+  Trash2,
 } from "lucide-react";
 import { api, money, date } from "../services/api";
 import {
@@ -28,6 +29,9 @@ export default function Products({ user, notify }) {
     [editing, setEditing] = useState(null),
     [editBusy, setEditBusy] = useState(false),
     [editError, setEditError] = useState(""),
+    [deleting, setDeleting] = useState(null),
+    [deleteBusy, setDeleteBusy] = useState(false),
+    [deleteError, setDeleteError] = useState(""),
     [pageError, setPageError] = useState("");
   useEffect(() => {
     const t = setTimeout(() => {
@@ -43,6 +47,29 @@ export default function Products({ user, notify }) {
     setEditError("");
     setPageError("");
     setEditing({ ...item, stock_quantity: Number(item.stock_quantity) });
+  }
+  async function deleteProduct(e) {
+    e.preventDefault();
+    if (deleteBusy) return;
+    setDeleteBusy(true);
+    setDeleteError("");
+    try {
+      await api("/api/products/" + deleting.id, {
+        method: "DELETE",
+        body: JSON.stringify({ version: deleting.version }),
+      });
+      setDeleting(null);
+      if (list.data.data.length === 1 && page > 1) setPage(page - 1);
+      else list.reload();
+      notify("Đã xoá sản phẩm " + deleting.sku + ".");
+    } catch (e) {
+      setDeleteError(e.uncertain
+        ? "Chưa xác định kết quả xoá. Đóng cửa sổ và làm mới danh mục để kiểm tra."
+        : e.message);
+      list.reload();
+    } finally {
+      setDeleteBusy(false);
+    }
   }
   async function saveEdit(e) {
     e.preventDefault();
@@ -177,6 +204,15 @@ export default function Products({ user, notify }) {
                           >
                             <Pencil size={15} />
                             Sửa
+                          </button>
+                          <button
+                            type="button"
+                            className="button danger"
+                            onClick={() => { setDeleteError(""); setDeleting(item); }}
+                            aria-label={"Xoá sản phẩm " + item.sku}
+                          >
+                            <Trash2 size={15} />
+                            Xoá
                           </button>
                         </td>
                       )}
@@ -339,6 +375,21 @@ export default function Products({ user, notify }) {
               <button className="button primary" disabled={editBusy}>
                 <Save size={16} />
                 {editBusy ? "Đang lưu…" : "Lưu thay đổi"}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+      {deleting && (
+        <Modal title="Xoá sản phẩm" onClose={() => { if (!deleteBusy) setDeleting(null); }}>
+          <form className="order-form product-edit-form" onSubmit={deleteProduct}>
+            <p>Bạn muốn xoá <strong>{deleting.name}</strong> ({deleting.sku}) khỏi danh mục?</p>
+            <p className="muted">Thao tác này không thể hoàn tác. Sản phẩm đã có trong đơn hàng sẽ không được xoá để giữ lịch sử giao dịch.</p>
+            <ErrorBox error={deleteError} />
+            <div className="form-footer">
+              <button type="button" className="button secondary" disabled={deleteBusy} onClick={() => setDeleting(null)}>Huỷ</button>
+              <button className="button danger" disabled={deleteBusy || !!deleteError}>
+                <Trash2 size={16} />{deleteBusy ? "Đang xoá…" : "Xác nhận xoá"}
               </button>
             </div>
           </form>

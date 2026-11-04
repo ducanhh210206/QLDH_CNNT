@@ -57,3 +57,6 @@ export const productEditSchema = productSchema
   .strict();
 export const update = (id, body) =>
   repo.update(validId(id), parse(productEditSchema, body));
+
+export const remove = (id, body) =>
+  repo.remove(validId(id), parse(productEditSchema.pick({ version: true }), body).version);

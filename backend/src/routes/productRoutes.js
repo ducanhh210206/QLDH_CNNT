@@ -18,3 +18,8 @@ productRoutes.post(
 productRoutes.patch("/:id", permission("products.create"), async (req, res) =>
   res.json(await svc.update(req.params.id, req.body)),
 );
+
+productRoutes.delete("/:id", permission("products.create"), async (req, res) => {
+  await svc.remove(req.params.id, req.body);
+  res.status(204).end();
+});

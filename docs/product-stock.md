@@ -46,6 +46,12 @@ PATCH /api/products/:id nhận body {"name":"Tên mới","unit_price":"250000.00
 
 Nếu version đã cũ, trả PRODUCT_VERSION_CONFLICT và không ghi đè bất kỳ trường nào. Tải lại danh mục rồi mở Sửa lại. Đổi tên/giá trong danh mục không sửa dữ liệu đơn đã tạo. Endpoint POST /api/products/:id/stock vẫn giữ cho tích hợp nhập thêm; không còn là thao tác chính trong bảng.
 
+## Xoá sản phẩm
+
+Trong danh mục, bấm **Xoá** rồi **Xác nhận xoá**. Quyền `products.create` cho phép thêm, sửa và xoá. Chỉ xoá sản phẩm chưa được dùng trong đơn hàng; sản phẩm có đơn (kể cả đã huỷ) được giữ lại để bảo toàn lịch sử. Không cần thay đổi schema.
+
+`DELETE /api/products/:id` nhận body `{"version":1}`, trả 204 khi thành công; 404 nếu không còn sản phẩm, 409 `PRODUCT_VERSION_CONFLICT` nếu thông tin đã thay đổi hoặc `PRODUCT_IN_USE` nếu có đơn. Backend khoá dòng sản phẩm trong cùng transaction với kiểm tra đơn và xoá; tạo đơn đồng thời dùng cùng khoá để tránh tham chiếu đến sản phẩm đã xoá.
+
 ## Mã sản phẩm tự sinh
 
 POST /api/products không cần sku. Backend tự tạo dạng SP-XXXXXXXXXXXX (12 ký tự hex viết hoa), dùng UNIQUE hiện có và thử mã khác tối đa 5 lần nếu trùng. Trường sku từ client cũ vẫn được chấp nhận để tương thích nhưng không quyết định mã được lưu. Mọi mã đang có giữ nguyên; PATCH không cho đổi sku. Không cần nâng schema cho thay đổi này.
