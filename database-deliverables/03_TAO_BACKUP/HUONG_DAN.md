@@ -15,7 +15,7 @@ File mẫu là database thử `task4_don_hang_gia`, không phải bản sao dữ
 Mở Docker Desktop và PowerShell tại thư mục gốc dự án, rồi chạy:
 
 ```powershell
-cd .\DATABASE_TEST\03_TAO_BACKUP
+cd .\database-deliverables\03_TAO_BACKUP
 powershell -NoProfile -ExecutionPolicy Bypass -File .\tao-backup.ps1 -SourceHost 'mysql-7b63f20-qldh-demo.b.aivencloud.com' -SourcePort 14586 -SourceUser 'avnadmin'
 ```
 
