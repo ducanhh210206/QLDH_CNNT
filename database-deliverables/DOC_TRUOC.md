@@ -2,6 +2,7 @@
 
 Mở các thư mục theo thứ tự số:
 
+0. **[02_DONG_BO](02_DONG_BO/HUONG_DAN.md)**: sơ đồ và hướng dẫn đồng bộ Aiven–Standby, kiểm tra, khởi động lại và các điều kiện chuyển đổi.
 1. **[03_TAO_BACKUP](03_TAO_BACKUP/HUONG_DAN.md)**: script sao lưu, chứng chỉ CA và file backup mẫu bằng dữ liệu giả.
 2. **[04_THU_KHOI_PHUC](04_THU_KHOI_PHUC/HUONG_DAN.md)**: kết quả khôi phục, bảng đối chiếu, file backup thử và công cụ để chạy lại.
 3. **[05_CHUYEN_DOI](05_CHUYEN_DOI/huong-dan-chuyen-doi.md)**: runbook failover/failback, trách nhiệm, điều kiện kiểm tra và minh chứng buổi thử ngày 08/11/2026.
