@@ -16,7 +16,7 @@ Kết quả đã ghi nhận: `PASS`; 2 đơn hàng và 3 dòng lịch sử đề
 Mở Docker Desktop; máy cần Python 3 và image Docker `mysql:8.4.13` đã có sẵn. Mở PowerShell tại thư mục gốc dự án, rồi chạy:
 
 ```powershell
-cd .\DATABASE_TEST\04_THU_KHOI_PHUC\cong-cu
+cd .\database-deliverables\04_THU_KHOI_PHUC\cong-cu
 python .\scripts\thu-khoi-phuc.py
 ```
 

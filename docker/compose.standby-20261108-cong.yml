@@ -1,0 +1,6 @@
+# Gan cong 3308 cho standby 08/11 sau khi cong duoc giai phong.
+# Luon dung cung compose.standby-20261108.yml.
+services:
+  mysql-standby:
+    ports:
+      - '127.0.0.1:3308:3306'

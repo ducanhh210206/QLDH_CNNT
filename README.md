@@ -627,7 +627,7 @@ Hướng dẫn chạy trực tiếp Node ở trên là cách bắt đầu. Nếu
 
 `docker/compose.app.yml` tạo hai Backend dùng chung MySQL hiện có, Monitor và Gateway; **không tạo MySQL Primary**. Cấu hình `.env` gốc dành cho Compose khác `backend/.env` dành cho Node chạy trực tiếp. Cần cấu hình riêng trước khi dùng Compose. Gateway mẫu dùng HTTP cho lab; môi trường public cần HTTPS và kiểm tra cấu hình cookie Secure/CORS.
 
-Hai Backend dùng chung MySQL chỉ dự phòng tiến trình, không bảo vệ khỏi mất máy chứa MySQL. `docker/compose.standby.yml` là mẫu lab opt-in, không tự thiết lập replication hoặc chuyển quyền ghi.
+Hai Backend dùng chung MySQL chỉ dự phòng tiến trình, không bảo vệ khỏi mất máy chứa MySQL. Cấu hình MySQL dự phòng và quy trình chuyển đổi của nhóm được mô tả trong [runbook Standby](database-deliverables/05_CHUYEN_DOI/huong-dan-chuyen-doi.md); Compose không tự thiết lập replication hoặc chuyển quyền ghi.
 
 ## 15. Trước khi đưa code lên Git
 

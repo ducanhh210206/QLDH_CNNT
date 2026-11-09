@@ -1,0 +1,26 @@
+# Standby moi sau failback: volume rieng, chua mo cong MySQL tren Windows.
+# Khong thay doi volume standby da nhan ghi trong buoi thu.
+name: omdrs-standby-sau-failback
+services:
+  mysql-standby:
+    image: mysql:8.4.13
+    environment:
+      MYSQL_ROOT_PASSWORD: ${STANDBY_ROOT_PASSWORD:?Set a dedicated standby root password}
+    command:
+      - --server-id=493203310
+      - --log-bin=mysql-bin
+      - --relay-log=standby-relay-bin
+      - --relay-log-index=standby-relay-bin.index
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-replica-updates=ON
+      - --skip-replica-start=ON
+      - --event-scheduler=OFF
+      - '--replicate-wild-do-table=order\_management.%'
+    volumes:
+      - standby_data:/var/lib/mysql
+      - ./mysql/init-standby-guard.sql:/docker-entrypoint-initdb.d/01-standby-guard.sql:ro
+      - ../database/backups/aiven-ca.pem:/etc/mysql/aiven-ca.pem:ro
+volumes:
+  standby_data:
+    name: omdrs-standby-sau-failback-data

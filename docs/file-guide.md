@@ -141,7 +141,7 @@ FE chỉ báo thành công khi API xác nhận. Dữ liệu đơn hàng không �
 | [gateway/nginx.conf](../gateway/nginx.conf) | Nginx phục vụ FE và proxy API tới BE Primary/Standby. Có failover thụ động; không phải active health checker hoặc cơ chế promotion database. |
 | [docker/compose.backend.yml](../docker/compose.backend.yml) | Chạy riêng BE bằng Docker, publish 127.0.0.1:5002 sang 5000 trong container, lấy secret từ backend/.env, dùng MySQL có sẵn và volume backup riêng. |
 | [docker/compose.app.yml](../docker/compose.app.yml) | Chạy hai BE, Monitor và Gateway/FE. Hai BE dùng chung MySQL hiện có; file không tạo MySQL Primary hoặc bảo đảm HA liên máy. |
-| [docker/compose.standby.yml](../docker/compose.standby.yml) | Mẫu MySQL Standby lab opt-in, volume/cổng riêng. Chưa cấu hình replication hoặc tự chuyển quyền ghi. |
+| [docker/compose.standby-sau-failback.yml](../docker/compose.standby-sau-failback.yml) | MySQL Standby hiện tại sau failback; dùng cùng file gắn cổng trong runbook, không tự cấu hình replication hay chuyển quyền ghi. |
 | [docker/mysql/my.cnf](../docker/mysql/my.cnf) | Cấu hình mẫu Standby: server-id, binlog, GTID và read_only/super_read_only. Không tự áp dụng lên MySQL Primary hiện tại. |
 
 ## 12. Scripts — công cụ vận hành

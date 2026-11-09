@@ -1,0 +1,5 @@
+# Gan cong 3308 cho standby sau failback, dung cung compose.standby-sau-failback.yml.
+services:
+  mysql-standby:
+    ports:
+      - '127.0.0.1:3308:3306'

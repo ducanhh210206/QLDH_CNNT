@@ -10,6 +10,6 @@
 
 ## Standby database lab riêng
 
-`docker/compose.standby.yml` chỉ là mẫu opt-in trên máy Standby: cần STANDBY_ROOT_PASSWORD riêng và profile standby-lab. Volume standby_lab_data khác mysql_data, cổng 3307. Không chạy mẫu này để thay Primary hiện có. Image MySQL 8.4.13 phải được registry hỗ trợ trên kiến trúc đích; chưa pull/build ở phiên làm việc này.
+Standby của nhóm dùng cấu hình [runbook chuyển đổi](../database-deliverables/05_CHUYEN_DOI/huong-dan-chuyen-doi.md), container và volume riêng trên máy Phúc, với cổng `127.0.0.1:3308`. Cần mật khẩu root riêng và chứng chỉ CA Aiven tại đường dẫn được cấu hình. Không dùng cấu hình Standby để thay Primary hiện có nếu chưa thực hiện quy trình chuyển đổi.
 
-Replication chưa cấu hình. Cần snapshot nguồn hợp lệ, GTID, tài khoản replication với quyền tối thiểu/TLS, mạng hai chiều, kiểm tra lag và quy trình fencing/promotion thủ công được phê duyệt. Không đồng thời bật ghi hai DB. Kiểm chứng triển khai liên máy trước khi tuyên bố HA.
+Replication Aiven → Standby đã được thử trong môi trường của nhóm. Trên máy hoặc môi trường mới vẫn phải xác minh snapshot, GTID, tài khoản replication, TLS, kết nối và độ trễ theo runbook. Không đồng thời bật ghi hai DB; kiểm chứng triển khai liên máy trước khi tuyên bố HA.
