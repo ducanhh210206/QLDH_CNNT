@@ -1987,3 +1987,16 @@ textarea:focus{outline:2px solid #087e7233;border-color:var(--teal)}
 .product-edit-form{padding:24px}.product-edit-form>p{margin-top:0;margin-bottom:20px}.product-edit-form small{display:block;margin-top:8px;color:var(--muted);font-weight:400}
 
 .product-code-hint{font-size:11px;color:var(--muted);margin:0 0 20px;padding:12px;background:var(--soft);border-radius:8px}.product-code-hint strong{color:var(--text)}
+
+/* Monitoring: four readable sections and responsive evidence controls. */
+.monitoring-page { display: grid; gap: 24px; min-width: 0; }
+.monitoring-page > .panel { min-width: 0; }
+.monitor-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 24px; }
+.monitor-services { padding: 0 24px 24px; }
+.monitor-service { border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-wrap: anywhere; }
+.monitor-service h4 { margin: 0 0 14px; }
+.monitor-service p, .monitor-service small { color: var(--muted); margin: 10px 0; }
+.monitor-metrics { padding: 0 24px; }
+.monitor-metrics .stat-card strong { font-size: 22px; }
+.monitor-form { border-top: 1px solid var(--line); padding: 24px; }
+.monitor-summary select { max-width: 100%; }

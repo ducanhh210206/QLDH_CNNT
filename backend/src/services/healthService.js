@@ -37,7 +37,7 @@ export async function systemStatus() {
   try {
     const r = await fetch(env.monitor + "/status", {
       headers: { Authorization: "Bearer " + env.monitorToken },
-      signal: AbortSignal.timeout(3000),
+      signal: AbortSignal.timeout(4000),
     });
     if (!r.ok) throw Error();
     monitoring = await r.json();
@@ -52,7 +52,7 @@ export async function systemStatus() {
   return {
     backend: await readiness(),
     monitoring,
-    standby_database: "Not Configured",
+    standby_database: monitoring.replication?.status || "Unknown",
     ha_verified: false,
   };
 }

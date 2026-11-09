@@ -6,6 +6,7 @@ import { rateLimit } from "express-rate-limit";
 export const adminRoutes = Router();
 adminRoutes.get("/system/status", s.status);
 adminRoutes.get("/system/metrics", s.metrics);
+adminRoutes.post("/system/incidents/:id/milestones", s.milestone);
 adminRoutes.get("/incidents", i.list);
 adminRoutes.get("/incidents/:id", i.get);
 adminRoutes.post("/simulations", i.simulate);

@@ -2,6 +2,8 @@
 
 Website quản lý đơn hàng với **React 19 + Vite 8**, **Node.js + Express 5**, **MySQL 8.4** và dịch vụ giám sát độc lập.
 
+Monitoring có 4 khu vực Server Status, Database Replication, Recovery Metrics và Incident Timeline. Xem [cấu hình nguồn dữ liệu và cách đo RTO/RPO](docs/monitoring-recovery.md); các số đo cần tiến trình Monitoring độc lập và bằng chứng thời gian thực tế.
+
 Chức năng chính: đăng nhập Nhân viên/Quản lý, tự đăng ký nhân viên hoặc được quản lý cấp tài khoản, phê duyệt tài khoản và cấp quyền, đăng nhập Google khi đã cấu hình OAuth, danh mục sản phẩm, đơn hàng, thống kê, lịch sử giao dịch, giám sát và backup/restore cách ly.
 
 > Hướng dẫn này dành cho người tải mã nguồn về máy mới. Repository không chứa tài khoản, mật khẩu, database hay dữ liệu trên máy tác giả. Người chạy phải tự cấu hình môi trường và tạo tài khoản website.
