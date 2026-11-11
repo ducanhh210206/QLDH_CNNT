@@ -58,6 +58,31 @@ test("readiness returns 503 when mandatory DB dependency is unavailable", async 
   assert.equal(r.status, 503);
   assert.equal(r.body.database, "Unhealthy");
 });
+test("standby readiness verifies the expected shared MySQL server", async (t) => {
+  const previous = { jwt: env.jwt, expectedDbUuid: env.expectedDbUuid, instance: env.instance };
+  t.after(() => Object.assign(env, previous));
+  env.jwt = "test-only-not-a-production-secret-1234567890";
+  env.instance = "standby";
+  env.expectedDbUuid = "aiven-test-uuid";
+  t.mock.method(pool, "query", async (sql) => sql.includes("schema_migrations")
+    ? [[{ version: "005_product_edit" }]] : [[{ server_uuid: "aiven-test-uuid" }]]);
+  const r = await request(app).get("/health/ready");
+  assert.equal(r.status, 200);
+  assert.equal(r.body.shared_database_verified, true);
+  assert.equal(r.body.verified_database_uuid, "aiven-test-uuid");
+});
+test("standby readiness refuses an unexpected MySQL server", async (t) => {
+  const previous = { jwt: env.jwt, expectedDbUuid: env.expectedDbUuid, instance: env.instance };
+  t.after(() => Object.assign(env, previous));
+  env.jwt = "test-only-not-a-production-secret-1234567890";
+  env.instance = "standby";
+  env.expectedDbUuid = "aiven-test-uuid";
+  t.mock.method(pool, "query", async (sql) => sql.includes("schema_migrations")
+    ? [[{ version: "005_product_edit" }]] : [[{ server_uuid: "other-uuid" }]]);
+  const r = await request(app).get("/health/ready");
+  assert.equal(r.status, 503);
+  assert.equal(r.body.database, "Unhealthy");
+});
 test("authenticated Staff is denied infrastructure operations", async (t) => {
   const old = env.jwt;
   env.jwt = "test-only-not-a-production-secret-1234567890";

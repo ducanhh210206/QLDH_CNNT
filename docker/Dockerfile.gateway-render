@@ -1,0 +1,18 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+COPY backend/package.json backend/package.json
+COPY frontend/package.json frontend/package.json
+COPY monitoring/package.json monitoring/package.json
+RUN npm ci --workspace=frontend
+COPY frontend frontend
+ENV VITE_API_BASE=""
+RUN npm run build -w frontend
+
+FROM node:24-alpine
+WORKDIR /app
+COPY gateway/auto-gateway.mjs gateway/auto-gateway.mjs
+COPY --from=build /app/frontend/dist frontend/dist
+ENV NODE_ENV=production GATEWAY_HOST=0.0.0.0 GATEWAY_EXTERNAL_HTTPS=true
+USER node
+CMD ["node", "gateway/auto-gateway.mjs"]

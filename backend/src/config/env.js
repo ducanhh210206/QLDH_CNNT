@@ -47,6 +47,7 @@ export const env = {
     .split(",")
     .map((origin) => origin.trim()),
   instance: process.env.INSTANCE_NAME || "primary",
+  expectedDbUuid: process.env.FAILOVER_EXPECTED_DB_UUID || "",
   google: {
     clientId: process.env.GOOGLE_CLIENT_ID || "",
     clientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
