@@ -1,0 +1,49 @@
+# Docker Desktop on the Standby Windows host. Selection is operator controlled.
+map "${GATEWAY_ACTIVE_BACKEND}" $gateway_origin {
+    default "https://${GATEWAY_PRIMARY_HOST}";
+    primary "https://${GATEWAY_PRIMARY_HOST}";
+    standby "http://host.docker.internal:${GATEWAY_STANDBY_PORT}";
+}
+map "${GATEWAY_ACTIVE_BACKEND}" $gateway_origin_host {
+    default "${GATEWAY_PRIMARY_HOST}";
+    primary "${GATEWAY_PRIMARY_HOST}";
+    standby "host.docker.internal";
+}
+map $http_x_forwarded_proto $gateway_scheme {
+    default $scheme;
+    https https;
+}
+server {
+    listen 80;
+    server_tokens off;
+    root /usr/share/nginx/html;
+    index index.html;
+    client_max_body_size 32k;
+    resolver 127.0.0.11 valid=30s ipv6=off;
+    location = /gateway/live {
+        access_log off;
+        default_type application/json;
+        return 200 '{"status":"Healthy","routing":"manual","selected":"${GATEWAY_ACTIVE_BACKEND}"}';
+    }
+    location ~ ^/(api|health)/ {
+        proxy_pass $gateway_origin;
+        proxy_http_version 1.1;
+        proxy_set_header Connection "";
+        proxy_set_header Host $gateway_origin_host;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto $gateway_scheme;
+        proxy_ssl_server_name on;
+        proxy_ssl_name $gateway_origin_host;
+        proxy_ssl_verify on;
+        proxy_ssl_verify_depth 4;
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+        proxy_connect_timeout 5s;
+        proxy_read_timeout 120s;
+        # No automatic retries, including POST/PATCH/DELETE with uncertain outcomes.
+        proxy_next_upstream off;
+        proxy_redirect off;
+    }
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}

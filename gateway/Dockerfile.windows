@@ -1,0 +1,15 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+COPY frontend/package.json frontend/package.json
+COPY backend/package.json backend/package.json
+COPY monitoring/package.json monitoring/package.json
+RUN npm ci --workspace=frontend
+COPY frontend frontend
+ENV VITE_API_BASE=""
+RUN npm run build -w frontend
+
+FROM nginx:alpine
+COPY --from=build /app/frontend/dist /usr/share/nginx/html
+COPY gateway/windows.conf.template /etc/nginx/templates/default.conf.template
+ENV NGINX_ENVSUBST_FILTER="^GATEWAY_(ACTIVE_BACKEND|PRIMARY_HOST|STANDBY_PORT)$"

@@ -1,0 +1,18 @@
+name: omdrs-gateway-windows
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: gateway/Dockerfile.windows
+    environment:
+      GATEWAY_PRIMARY_HOST: ${GATEWAY_PRIMARY_HOST:-qldh-demo.onrender.com}
+      GATEWAY_STANDBY_PORT: ${GATEWAY_STANDBY_PORT:-5000}
+      GATEWAY_ACTIVE_BACKEND: ${GATEWAY_ACTIVE_BACKEND:-primary}
+    ports:
+      - '127.0.0.1:8080:80'
+    restart: unless-stopped
+    healthcheck:
+      test: [CMD-SHELL, 'wget -q -O /dev/null http://127.0.0.1/gateway/live || exit 1']
+      interval: 10s
+      timeout: 3s
+      retries: 3

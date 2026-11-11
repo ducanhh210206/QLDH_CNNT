@@ -4,6 +4,8 @@ Website quản lý đơn hàng với **React 19 + Vite 8**, **Node.js + Express 
 
 Monitoring có 4 khu vực Server Status, Database Replication, Recovery Metrics và Incident Timeline. Xem [cấu hình nguồn dữ liệu và cách đo RTO/RPO](docs/monitoring-recovery.md); các số đo cần tiến trình Monitoring độc lập và bằng chứng thời gian thực tế.
 
+Để dùng một URL chung qua Gateway trên máy Standby Windows, xem [hướng dẫn Gateway Windows](docs/gateway-windows.md). Cấu hình này mặc định trỏ Render Primary, chuyển tuyến thủ công sau khi người vận hành xác nhận an toàn database; không tự promotion MySQL.
+
 Chức năng chính: đăng nhập Nhân viên/Quản lý, tự đăng ký nhân viên hoặc được quản lý cấp tài khoản, phê duyệt tài khoản và cấp quyền, đăng nhập Google khi đã cấu hình OAuth, danh mục sản phẩm, đơn hàng, thống kê, lịch sử giao dịch, giám sát và backup/restore cách ly.
 
 > Hướng dẫn này dành cho người tải mã nguồn về máy mới. Repository không chứa tài khoản, mật khẩu, database hay dữ liệu trên máy tác giả. Người chạy phải tự cấu hình môi trường và tạo tài khoản website.
