@@ -46,3 +46,30 @@ test('replication distinguishes no channel, null lag, stopped thread, multi-chan
   assert.equal(replicationSnapshot([{...row,Last_SQL_Errno:123}],at).status,'Unhealthy');
   assert.equal(replicationSnapshot([row,{...row,Channel_Name:'second',Seconds_Behind_Source:8}],at).lag_seconds,8);
 });
+
+test('a new outage is not swallowed by an incomplete historical incident', () => {
+  const historical = {id:'old',timeline:[{stage:'detected',at:'2026-11-01T00:00:00Z'}]};
+  const incidents = observeIncidents([historical], healthy, offline, at);
+  assert.equal(incidents.length, 2);
+  assert.notEqual(incidents[0].id, 'old');
+  assert.equal(incidents[1].tracking_close_reason, 'new_outage');
+  assert.equal(incidents[1].timeline.length, 1);
+  assert.equal(incidents[0].trigger, 'primary_outage');
+  observeIncidents(incidents, offline, offline, at);
+  assert.equal(incidents.length, 2);
+});
+
+test('return to Primary closes tracking without claiming recovery; next switch starts a separate incident', () => {
+  const gateway = instance => ({name:'API Gateway',status:'Healthy',instance});
+  let incidents = observeIncidents([], [...healthy,gateway('primary')], [...offline,gateway('standby')], at);
+  const id = incidents[0].id;
+  incidents = observeIncidents(incidents, [...offline,gateway('standby')], [...healthy,gateway('primary')], '2026-11-09T01:02:00Z');
+  assert.equal(incidents[0].tracking_close_reason, 'primary_active');
+  assert.equal(incidents[0].timeline.some(e=>e.stage==='recovered'),false);
+  assert.equal(recoveryMetrics(incidents[0]).rto_ms,null);
+  incidents = observeIncidents(incidents, [...healthy,gateway('primary')], [...healthy,gateway('standby')], '2026-11-09T01:03:00Z');
+  assert.equal(incidents.length,2);
+  assert.notEqual(incidents[0].id,id);
+  assert.equal(incidents[0].trigger,'gateway_switch');
+  assert.equal(incidents[0].timeline.some(e=>e.stage==='fault_started'),false);
+});

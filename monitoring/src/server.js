@@ -169,6 +169,7 @@ const server = http.createServer(async (req, res) => {
   res.end(
     JSON.stringify({
       status: "Healthy",
+      server_time: new Date().toISOString(),
       checked_at: lastCheckAt,
       components,
       events,
