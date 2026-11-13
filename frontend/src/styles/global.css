@@ -2006,5 +2006,8 @@ textarea:focus{outline:2px solid #087e7233;border-color:var(--teal)}
 .monitor-service p, .monitor-service small { color: var(--muted); margin: 10px 0; }
 .monitor-metrics { padding: 0 24px; }
 .monitor-metrics .stat-card strong { font-size: 22px; }
+.monitor-metrics .stat-card small { display: block; margin-top: 10px; color: var(--muted); }
+.monitor-live-recovery { margin: 0 24px 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--soft); }
+.monitor-live-recovery small { flex-basis: 100%; color: var(--muted); }
 .monitor-form { border-top: 1px solid var(--line); padding: 24px; }
 .monitor-summary select { max-width: 100%; }

@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Server, Database, Activity, Clock } from "lucide-react";
 import { useData, PageHeading, Panel, Badge, ErrorBox, Refresh } from "../components/common";
 import { api, date } from "../services/api";
+import { liveRecoveryMetrics } from "../services/recoveryMetrics";
 const labels = {
   fault_started: "Bắt đầu lỗi", detected: "Phát hiện lỗi", failover_started: "Bắt đầu failover",
   standby_active: "Máy dự phòng tiếp quản", recovered: "Hoàn tất khôi phục",
@@ -13,12 +14,21 @@ export default function SystemMonitoring() {
   const [selected, setSelected] = useState("");
   const [saveError, setSaveError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [clock, setClock] = useState(() => ({ now: Date.now(), receivedAt: Date.now() }));
   const data = status.data, monitor = data?.monitoring;
+  useEffect(() => {
+    const receivedAt = Date.now();
+    setClock({ now: receivedAt, receivedAt });
+    const timer = setInterval(() => setClock({ now: Date.now(), receivedAt }), 1000);
+    return () => clearInterval(timer);
+  }, [monitor]);
   const incidents = monitor?.incidents || [];
   const incident = incidents.find((i) => i.id === selected) || incidents[0];
   const replication = monitor?.replication;
   const checked = Date.parse(monitor?.checked_at);
   const stale = !!status.error || !Number.isFinite(checked) || Date.now() - checked > Math.max(30000, (monitor?.poll_interval_ms || 10000) * 2 + 10000);
+  const serverNow = Date.parse(monitor?.server_time || monitor?.checked_at) + Math.max(0, clock.now - clock.receivedAt);
+  const liveMetrics = liveRecoveryMetrics(incident, serverNow, stale);
   const active = !stale && ["primary", "standby"].includes(monitor?.active_instance)
     ? monitor.active_instance : null;
   const components = monitor?.components?.length ? monitor.components : [
@@ -76,15 +86,27 @@ export default function SystemMonitoring() {
       {!!replication?.channels?.length && <div className="table-scroll"><table><thead><tr><th>KÊNH</th><th>LUỒNG NHẬN</th><th>LUỒNG ÁP DỤNG</th><th>TRẠNG THÁI</th></tr></thead>
         <tbody>{replication.channels.map((c) => <tr key={c.name}><td>{c.name}</td><td>{c.io_running}</td><td>{c.sql_running}</td><td><Badge status={stale ? "Unknown" : c.status} /></td></tr>)}</tbody></table></div>}
     </Panel>
-    <Panel title="3. Recovery Metrics" subtitle="Tính từ timeline của sự cố được chọn. Các mốc do người vận hành ghi nhận cần kèm ghi chú đối chiếu." action={<Activity size={20} />}>
-      <div className="monitor-summary"><label>Sự cố <select aria-label="Chọn sự cố" value={incident?.id || ""} onChange={(e) => { setSelected(e.target.value); setSaveError(""); }}>
-        {!incidents.length && <option value="">Chưa ghi nhận sự cố thực tế</option>}
+    <Panel title="3. Recovery Metrics" subtitle="Bộ đếm cập nhật mỗi giây; trạng thái máy được lấy lại mỗi 10 giây. Mặc định tự theo dõi sự cố mới nhất." action={<Activity size={20} />}>
+      <div className="monitor-summary"><label>Sự cố <select aria-label="Chọn sự cố" value={selected} onChange={(e) => { setSelected(e.target.value); setSaveError(""); }}>
+        <option value="">{incidents.length ? "Tự động — sự cố mới nhất" : "Chưa ghi nhận sự cố thực tế"}</option>
         {incidents.map((i) => <option key={i.id} value={i.id}>{date(i.timeline.find((e) => e.stage === "detected")?.at)} · {i.id.slice(0, 8)}</option>)}
       </select></label></div>
+      {incident && <div className="monitor-summary monitor-live-recovery">
+        <strong>{liveMetrics.observationLive ? "Đang theo dõi chuyển đổi: " : "Từ lần ghi nhận sự cố đến Standby Healthy: "}{duration(liveMetrics.observation)}</strong>
+        <span>Sự cố: {date(incident.timeline.find((e) => e.stage === "detected")?.at)} · {incident.id.slice(0, 8)}</span>
+        <span>{stale ? "Tạm dừng bộ đếm: chưa có dữ liệu Monitoring mới."
+          : liveMetrics.standbyObserved ? "Gateway đã quan sát Standby Healthy. Cần kiểm chứng giao dịch để xác nhận hoàn tất khôi phục."
+          : incident.tracking_closed_at ? "Đã kết thúc theo dõi lần chuyển này; các mốc xác nhận còn thiếu vẫn được giữ nguyên."
+          : "Đang chờ Gateway xác nhận Standby tiếp quản."}</span>
+        <small>Đây là thời gian quan sát, không thay thế RTO/RPO thực tế. Nếu cả phát hiện và tiếp quản được ghi trong cùng lượt kiểm tra, kết quả có thể là 0 giây.</small>
+      </div>}
       <div className="stats-grid compact monitor-metrics">{[
-        ["RTO", incident?.metrics?.rto_ms], ["RPO theo mốc dữ liệu đã đối chiếu", incident?.metrics?.rpo_ms],
-        ["Thời gian phát hiện", incident?.metrics?.detection_ms], ["Thời gian chuyển sang dự phòng", incident?.metrics?.failover_ms],
-      ].map(([name, value]) => <div className="stat-card" key={name}><span>{name}</span><strong>{duration(value)}</strong></div>)}</div>
+        ["RTO", liveMetrics.rto.value, liveMetrics.rto.live, "Cần mốc bắt đầu lỗi và hoàn tất khôi phục."],
+        ["RPO theo mốc dữ liệu đã đối chiếu", liveMetrics.rpo, false, "Cần mốc bắt đầu lỗi và dữ liệu phục hồi đã đối chiếu."],
+        ["Thời gian phát hiện", liveMetrics.detection, false, "Cần mốc bắt đầu lỗi và phát hiện lỗi."],
+        ["Thời gian chuyển sang dự phòng", liveMetrics.failover.value, liveMetrics.failover.live, "Cần mốc bắt đầu failover và Standby tiếp quản."],
+      ].map(([name, value, running, missing]) => <div className="stat-card" key={name}><span>{name}</span><strong>{duration(value)}</strong>
+        <small>{running ? "Đang đo — chưa chốt kết quả." : value == null ? missing : "Tính từ các mốc đã ghi nhận."}</small></div>)}</div>
       <p className="panel-padding muted">RTO = khôi phục − bắt đầu lỗi. RPO = bắt đầu lỗi − mốc dữ liệu cuối đã phục hồi và đối chiếu. Phát hiện = phát hiện − bắt đầu lỗi. Chuyển máy = tiếp quản − bắt đầu failover. Thiếu mốc sẽ hiện “Chưa đo”. Sai số quan sát chịu ảnh hưởng chu kỳ kiểm tra và thời gian phản hồi.</p>
     </Panel>
     <Panel title="4. Incident Timeline" subtitle="Lưu bởi Monitoring độc lập; vẫn ghi khi Backend Primary mất kết nối. Không tự thực hiện failover." action={<Clock size={20} />}>

@@ -8,14 +8,27 @@ export function activeInstance(components) {
 export function observeIncidents(incidents, previous, next, at) {
   const primary = next.find((c) => c.name === "Backend Primary");
   const old = previous.find((c) => c.name === "Backend Primary");
-  let current = incidents.find((i) => !i.timeline.some((e) => e.stage === "recovered"));
-  if (!current && old?.status === "Healthy" && ["Offline", "Unhealthy"].includes(primary?.status)) {
+  let current = incidents.find((i) => !i.tracking_closed_at && !i.timeline.some((e) => e.stage === "recovered"));
+  const outage = old?.status === "Healthy" && ["Offline", "Unhealthy"].includes(primary?.status);
+  const switched = activeInstance(previous) === "primary" && activeInstance(next) === "standby";
+  if (outage || switched && (!current || primary?.status === "Healthy" || current.timeline.some((e) => e.stage === "standby_active"))) {
+    if (current) {
+      current.tracking_closed_at = at;
+      current.tracking_close_reason = "new_outage";
+    }
     current = { id: randomUUID(), mode: "Live", component: "Backend Primary", verified_data_at: null,
-      timeline: [{ stage: "detected", at, source: "probe", note: "Lần kiểm tra đầu tiên ghi nhận Primary không sẵn sàng." }] };
+      trigger: outage ? "primary_outage" : "gateway_switch",
+      timeline: [{ stage: "detected", at, source: outage ? "probe" : "gateway",
+        note: outage ? "Lần kiểm tra đầu tiên ghi nhận Primary không sẵn sàng."
+          : "Quan sát Gateway chuyển từ Primary sang Standby; chưa xác nhận thời điểm xảy ra lỗi." }] };
     incidents.unshift(current);
   }
   if (current && activeInstance(next) === "standby" && !current.timeline.some((e) => e.stage === "standby_active"))
     current.timeline.push({ stage: "standby_active", at, source: "gateway", note: "Gateway trả readiness Healthy từ instance standby; chưa xác nhận an toàn quyền ghi database." });
+  if (current && primary?.status === "Healthy" && activeInstance(next) === "primary") {
+    current.tracking_closed_at = at;
+    current.tracking_close_reason = "primary_active";
+  }
   return incidents.slice(0, 100);
 }
 export function recordMilestone(incident, input, now = Date.now()) {
