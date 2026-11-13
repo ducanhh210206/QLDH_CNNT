@@ -4,7 +4,7 @@ import { mkdir, appendFile, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { timingSafeEqual } from "node:crypto";
 import { resolve } from "node:path";
-import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics } from "./recovery.js";
+import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics, sortIncidents, reconcileIncidentHistory } from "./recovery.js";
 import { probeReplication } from "./replication.js";
 dotenv.config({
   path: fileURLToPath(new URL("../.env", import.meta.url)),
@@ -23,8 +23,9 @@ try {
   const lines = (await readFile(recoveryFile, "utf8")).trim().split("\n").filter(Boolean);
   for (const line of lines) {
     const record = JSON.parse(line);
-    incidents = [record, ...incidents.filter((i) => i.id !== record.id)].slice(0, 100);
+    incidents = [record, ...incidents.filter((i) => i.id !== record.id)];
   }
+  sortIncidents(incidents);
 } catch (e) { if (e.code !== "ENOENT") persistenceError = true; }
 let writes = Promise.resolve();
 function exclusive(fn) {
@@ -46,7 +47,10 @@ try {
     .filter(Boolean)
     .map((l) => JSON.parse(l))
     .slice(-100);
-} catch {}
+} catch (e) { if (e.code !== "ENOENT") persistenceError = true; }
+try {
+  await persist(reconcileIncidentHistory(structuredClone(incidents), events));
+} catch { persistenceError = true; }
 const targets = [
   ["Backend Primary", process.env.PRIMARY_URL || "http://127.0.0.1:5000"],
   ["Backend Standby", process.env.STANDBY_URL],
@@ -80,6 +84,7 @@ async function check() {
       }
     }),
   );
+  const observedAt = new Date().toISOString();
   for (const item of next) {
     const previous = components.find((c) => c.name === item.name);
     if (item.status !== "Not Configured" && previous?.status !== item.status) {
@@ -90,7 +95,7 @@ async function check() {
         component: item.name,
         from: previous?.status || "Unknown",
         status: item.status,
-        created_at: new Date().toISOString(),
+        created_at: observedAt,
       };
       events.push(event);
       events = events.slice(-100);
@@ -98,7 +103,7 @@ async function check() {
     }
   }
   await exclusive(async () => {
-    const updated = observeIncidents(structuredClone(incidents), components, next, new Date().toISOString());
+    const updated = observeIncidents(structuredClone(incidents), components, next, observedAt);
     try { await persist(updated); } catch { persistenceError = true; }
     components = next;
   });

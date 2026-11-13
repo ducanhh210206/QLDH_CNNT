@@ -90,7 +90,8 @@ export default function SystemMonitoring() {
       <div className="monitor-summary"><label>Sự cố <select aria-label="Chọn sự cố" value={selected} onChange={(e) => { setSelected(e.target.value); setSaveError(""); }}>
         <option value="">{incidents.length ? "Tự động — sự cố mới nhất" : "Chưa ghi nhận sự cố thực tế"}</option>
         {incidents.map((i) => <option key={i.id} value={i.id}>{date(i.timeline.find((e) => e.stage === "detected")?.at)} · {i.id.slice(0, 8)}</option>)}
-      </select></label></div>
+      </select></label><span>Đã lưu {incidents.length} lần theo dõi. Chọn một lần cũ để xem lại timeline và số đo.</span></div>
+      {incident?.restored_from_history && <p className="panel-padding muted">Lần này được khôi phục từ nhật ký phát hiện lỗi. Những mốc không có trong nhật ký vẫn để trống; không phải một lần diễn tập mới vừa bắt đầu.</p>}
       {incident && <div className="monitor-summary monitor-live-recovery">
         <strong>{liveMetrics.observationLive ? "Đang theo dõi chuyển đổi: " : "Từ lần ghi nhận sự cố đến Standby Healthy: "}{duration(liveMetrics.observation)}</strong>
         <span>Sự cố: {date(incident.timeline.find((e) => e.stage === "detected")?.at)} · {incident.id.slice(0, 8)}</span>

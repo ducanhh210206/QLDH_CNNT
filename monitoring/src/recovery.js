@@ -1,6 +1,35 @@
 import { randomUUID } from "node:crypto";
 
 export const stages = ["fault_started", "detected", "failover_started", "standby_active", "recovered"];
+const detectedAt = incident => Date.parse(incident.timeline.find(e => e.stage === "detected")?.at);
+export function sortIncidents(incidents) {
+  return incidents.sort((a, b) => (detectedAt(b) || 0) - (detectedAt(a) || 0));
+}
+export function reconcileIncidentHistory(incidents, events) {
+  // Recover only detections actually recorded by a probe. Never infer fault,
+  // takeover or successful recovery timestamps from a Healthy event.
+  for (const event of events) {
+    if (event.component !== "Backend Primary" || event.from !== "Healthy" ||
+        !["Offline", "Unhealthy"].includes(event.status) || !Number.isFinite(Date.parse(event.created_at))) continue;
+    const matched = incidents.find(i => i.detection_event_id === event.id ||
+      // Older versions wrote the timeline a few milliseconds after the health log.
+      i.trigger !== "gateway_switch" && Math.abs(detectedAt(i) - Date.parse(event.created_at)) < 1000);
+    if (matched) continue;
+    incidents.push({ id: randomUUID(), mode: "Live", component: "Backend Primary",
+      trigger: "primary_outage", detection_event_id: event.id, restored_from_history: true,
+      verified_data_at: null, timeline: [{stage:"detected",at:event.created_at,source:"probe",
+        note:"Khôi phục mốc phát hiện từ nhật ký chuyển Primary từ Healthy sang lỗi; chưa có mốc bắt đầu lỗi thực tế."}] });
+  }
+  sortIncidents(incidents);
+  for (let n = 1; n < incidents.length; n++) {
+    const older = incidents[n];
+    if (!older.tracking_closed_at && !older.timeline.some(e => e.stage === "recovered")) {
+      older.tracking_closed_at = incidents[n - 1].timeline.find(e => e.stage === "detected").at;
+      older.tracking_close_reason = "new_outage";
+    }
+  }
+  return incidents;
+}
 export function activeInstance(components) {
   const gateway = components.find((c) => c.name === "API Gateway");
   return gateway?.status === "Healthy" ? gateway.instance || null : null;
@@ -29,7 +58,7 @@ export function observeIncidents(incidents, previous, next, at) {
     current.tracking_closed_at = at;
     current.tracking_close_reason = "primary_active";
   }
-  return incidents.slice(0, 100);
+  return sortIncidents(incidents);
 }
 export function recordMilestone(incident, input, now = Date.now()) {
   const stage = input.stage;

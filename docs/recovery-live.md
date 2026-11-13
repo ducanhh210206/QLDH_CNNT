@@ -7,6 +7,14 @@ Mục 3 mặc định chọn **Tự động — sự cố mới nhất**. Có th
 - Khi Primary Healthy và Gateway trở lại Primary, kết thúc theo dõi lần cũ; đây không phải bằng chứng giao dịch đã phục hồi hoặc dữ liệu đã đối chiếu.
 - Monitoring phải đang chạy và quan sát được chuyển trạng thái. Không tái dựng thời gian đã bỏ lỡ khi Monitoring tắt, không tạo mốc quá khứ giả sau nâng cấp.
 
+## Mỗi lần diễn tập là một bản ghi
+
+Giữ Monitoring chạy xuyên suốt. Mỗi lần quan sát Primary từ Healthy sang Offline/Unhealthy sẽ tạo ID sự cố mới. Khi Gateway trở về Primary và Primary Healthy, phiên theo dõi cũ kết thúc. Lần lỗi tiếp theo không ghi đè phiên cũ, kể cả phiên cũ chưa có đủ mốc RTO/RPO. Không cần xóa file, tạo lại tài khoản hoặc xóa sự cố để làm lại.
+
+Mục 3 hiển thị tổng số lần đã lưu và tự chọn lần mới nhất theo **giờ phát hiện**, không theo lần sửa nhật ký gần nhất. Chọn một dòng lịch sử để xem lại; chọn Tự động để quay về lần mới nhất.
+
+Lưu bền vững trên máy chạy Monitoring tại `monitoring/data/recovery.jsonl` (hoặc MONITOR_DATA_DIR nếu cấu hình). Tất cả bản ghi được giữ qua khởi động lại; không còn cắt danh sách ở 100 sự cố. Cần giữ volume/thư mục này khi cập nhật code. Nhật ký health trong `incidents.jsonl` cũng cần được giữ. Khi nâng cấp, Monitoring có thể tạo lại các bản ghi phát hiện lỗi bị bỏ sót từ 100 chuyển trạng thái gần nhất đã lưu; không tạo trùng và không tự suy diễn giờ bắt đầu lỗi/tiếp quản/khôi phục. Khi chỉ thấy Primary Offline ở lần kiểm tra đầu tiên sau khởi động và không có nhật ký trước đó, không thể biết giờ bắt đầu sự cố.
+
 Phần **thời gian quan sát** chạy từ lúc ghi nhận sự cố đến khi Gateway quan sát Standby Healthy rồi dừng. Hai mốc trong cùng lượt kiểm tra có thể cho kết quả 0 giây; không có nghĩa failover thực tế tức thời. Đây không phải RTO xác nhận và không chứng minh database được phép ghi.
 
 RTO và thời gian failover có bộ đếm đang đo nếu đã nhập mốc bắt đầu tương ứng. Chốt kết quả khi có mốc kết thúc. RPO và thời gian phát hiện vẫn cần bằng chứng thời điểm bắt đầu lỗi/dữ liệu đã đối chiếu. Không lấy replication lag làm RPO. Dữ liệu Monitoring cũ hoặc mất kết nối sẽ tạm dừng bộ đếm trực tiếp.

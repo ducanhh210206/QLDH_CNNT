@@ -60,9 +60,24 @@ test('independent monitor persists outage milestones across restart and protects
     assert.equal((await post()).status,200);
     assert.equal((await post()).status,400);
     assert.equal((await status()).incidents[0].metrics.detection_ms,1000);
+    // Repeated polls must not create duplicate incidents.
+    assert.equal((await status()).incidents.length,1);
+    primary=true; standby=false;
+    for(let n=0;n<65;n++){body=await status();if(body.active_instance==='primary' && body.components[0].status==='Healthy')break;await delay(100);}
+    assert.equal(body.active_instance,'primary');
+    primary=false; standby=true;
+    for(let n=0;n<65;n++){body=await status();if(body.incidents.length===2)break;await delay(100);}
+    assert.equal(body.incidents.length,2);
+    assert.notEqual(body.incidents[0].id,incident.id);
+    assert.ok(body.incidents.some(i=>i.id===incident.id));
+    const newestId=body.incidents[0].id;
+    await stop(); await launch();
+    body=await status();
+    assert.equal(body.incidents.length,2);
+    assert.equal(body.incidents[0].id,newestId);
     assert.ok((await readFile(join(dir,'recovery.jsonl'),'utf8')).includes(incident.id));
     await stop(); await launch();
-    assert.equal((await status()).incidents[0].id,incident.id);
-    assert.equal((await status()).incidents[0].metrics.detection_ms,1000);
+    assert.equal((await status()).incidents[0].id,newestId);
+    assert.equal((await status()).incidents.find(i=>i.id===incident.id).metrics.detection_ms,1000);
   } finally { await stop(); await new Promise(resolve=>fake.close(resolve)); await rm(dir,{recursive:true,force:true}); }
 });
