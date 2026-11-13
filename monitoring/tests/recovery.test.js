@@ -102,3 +102,21 @@ test('more than 100 incidents remain available and edits to an old incident do n
   assert.equal(next.length,105);
   assert.equal(next.at(-1).id,'0');
 });
+
+test('automatic samples and API recovery are persisted independently of business recovery', () => {
+  const sample = (name,instance,seconds,status='Healthy') => ({name,instance,status,checked_at:new Date(Date.parse(at)+seconds*1000).toISOString()});
+  let previous=[sample('Backend Primary','primary',-10),sample('API Gateway','primary',-9)];
+  let next=[sample('Backend Primary','primary',0,'Offline'),sample('API Gateway',null,0,'Offline')];
+  let incidents=observeIncidents([],previous,next,at);
+  assert.equal(incidents[0].observation.primary_last_healthy_at,previous[0].checked_at);
+  assert.equal(incidents[0].observation.gateway_unavailable_at,at);
+  assert.equal(incidents[0].api_recovered_at,undefined);
+  previous=next;
+  next=[sample('Backend Primary','primary',15,'Offline'),sample('API Gateway','standby',15)];
+  const takeover=new Date(Date.parse(at)+15000).toISOString();
+  incidents=observeIncidents(incidents,previous,next,takeover);
+  assert.equal(incidents[0].api_recovered_at,takeover);
+  assert.equal(incidents[0].api_recovered_instance,'standby');
+  assert.equal(incidents[0].timeline.some(e=>e.stage==='recovered'),false);
+  assert.equal(recoveryMetrics(incidents[0]).rpo_ms,null);
+});
