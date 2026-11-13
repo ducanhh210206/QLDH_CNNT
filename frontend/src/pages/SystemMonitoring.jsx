@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
 import { Server, Database, Activity, Clock } from "lucide-react";
 import { useData, PageHeading, Panel, Badge, ErrorBox, Refresh } from "../components/common";
-import { api, date } from "../services/api";
-import { liveRecoveryMetrics } from "../services/recoveryMetrics";
+import { date } from "../services/api";
+import { automaticRecoveryMetrics } from "../services/recoveryMetrics";
 const labels = {
   fault_started: "Bắt đầu lỗi", detected: "Phát hiện lỗi", failover_started: "Bắt đầu failover",
   standby_active: "Máy dự phòng tiếp quản", recovered: "Hoàn tất khôi phục",
@@ -12,8 +12,7 @@ export default function SystemMonitoring() {
   const status = useData("/api/admin/system/status", 10000);
   const runtime = useData("/api/admin/system/metrics", 10000);
   const [selected, setSelected] = useState("");
-  const [saveError, setSaveError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [historyPage, setHistoryPage] = useState(0);
   const [clock, setClock] = useState(() => ({ now: Date.now(), receivedAt: Date.now() }));
   const data = status.data, monitor = data?.monitoring;
   useEffect(() => {
@@ -28,7 +27,8 @@ export default function SystemMonitoring() {
   const checked = Date.parse(monitor?.checked_at);
   const stale = !!status.error || !Number.isFinite(checked) || Date.now() - checked > Math.max(30000, (monitor?.poll_interval_ms || 10000) * 2 + 10000);
   const serverNow = Date.parse(monitor?.server_time || monitor?.checked_at) + Math.max(0, clock.now - clock.receivedAt);
-  const liveMetrics = liveRecoveryMetrics(incident, serverNow, stale);
+  const measurement = automaticRecoveryMetrics(incident, serverNow, stale);
+  const page = Math.min(historyPage, Math.max(0, Math.ceil(incidents.length / 10) - 1));
   const active = !stale && ["primary", "standby"].includes(monitor?.active_instance)
     ? monitor.active_instance : null;
   const components = monitor?.components?.length ? monitor.components : [
@@ -38,20 +38,6 @@ export default function SystemMonitoring() {
     { name: "API Gateway", status: "Not Configured" },
   ];
   function refresh() { status.reload(); runtime.reload(); }
-  async function save(e) {
-    e.preventDefault();
-    if (busy) return;
-    const form = e.currentTarget, values = Object.fromEntries(new FormData(form));
-    setBusy(true); setSaveError("");
-    try {
-      await api("/api/admin/system/incidents/" + incident.id + "/milestones", {
-        method: "POST", body: JSON.stringify({ stage: values.stage, note: values.note,
-          at: new Date(values.at).toISOString(),
-          ...(values.verified_data_at ? { verified_data_at: new Date(values.verified_data_at).toISOString() } : {}) }),
-      });
-      form.reset(); status.reload();
-    } catch (e) { setSaveError(e.message); } finally { setBusy(false); }
-  }
   return <div className="monitoring-page">
     <PageHeading title="Giám sát hệ thống" description="Theo dõi máy chủ, đồng bộ dữ liệu và thời gian khôi phục mỗi 10 giây.">
       <Refresh onClick={refresh} />
@@ -86,51 +72,50 @@ export default function SystemMonitoring() {
       {!!replication?.channels?.length && <div className="table-scroll"><table><thead><tr><th>KÊNH</th><th>LUỒNG NHẬN</th><th>LUỒNG ÁP DỤNG</th><th>TRẠNG THÁI</th></tr></thead>
         <tbody>{replication.channels.map((c) => <tr key={c.name}><td>{c.name}</td><td>{c.io_running}</td><td>{c.sql_running}</td><td><Badge status={stale ? "Unknown" : c.status} /></td></tr>)}</tbody></table></div>}
     </Panel>
-    <Panel title="3. Recovery Metrics" subtitle="Bộ đếm cập nhật mỗi giây; trạng thái máy được lấy lại mỗi 10 giây. Mặc định tự theo dõi sự cố mới nhất." action={<Activity size={20} />}>
-      <div className="monitor-summary"><label>Sự cố <select aria-label="Chọn sự cố" value={selected} onChange={(e) => { setSelected(e.target.value); setSaveError(""); }}>
-        <option value="">{incidents.length ? "Tự động — sự cố mới nhất" : "Chưa ghi nhận sự cố thực tế"}</option>
-        {incidents.map((i) => <option key={i.id} value={i.id}>{date(i.timeline.find((e) => e.stage === "detected")?.at)} · {i.id.slice(0, 8)}</option>)}
-      </select></label><span>Đã lưu {incidents.length} lần theo dõi. Chọn một lần cũ để xem lại timeline và số đo.</span></div>
-      {incident?.restored_from_history && <p className="panel-padding muted">Lần này được khôi phục từ nhật ký phát hiện lỗi. Những mốc không có trong nhật ký vẫn để trống; không phải một lần diễn tập mới vừa bắt đầu.</p>}
-      {incident && <div className="monitor-summary monitor-live-recovery">
-        <strong>{liveMetrics.observationLive ? "Đang theo dõi chuyển đổi: " : "Từ lần ghi nhận sự cố đến Standby Healthy: "}{duration(liveMetrics.observation)}</strong>
-        <span>Sự cố: {date(incident.timeline.find((e) => e.stage === "detected")?.at)} · {incident.id.slice(0, 8)}</span>
-        <span>{stale ? "Tạm dừng bộ đếm: chưa có dữ liệu Monitoring mới."
-          : liveMetrics.standbyObserved ? "Gateway đã quan sát Standby Healthy. Cần kiểm chứng giao dịch để xác nhận hoàn tất khôi phục."
-          : incident.tracking_closed_at ? "Đã kết thúc theo dõi lần chuyển này; các mốc xác nhận còn thiếu vẫn được giữ nguyên."
-          : "Đang chờ Gateway xác nhận Standby tiếp quản."}</span>
-        <small>Đây là thời gian quan sát, không thay thế RTO/RPO thực tế. Nếu cả phát hiện và tiếp quản được ghi trong cùng lượt kiểm tra, kết quả có thể là 0 giây.</small>
-      </div>}
-      <div className="stats-grid compact monitor-metrics">{[
-        ["RTO", liveMetrics.rto.value, liveMetrics.rto.live, "Cần mốc bắt đầu lỗi và hoàn tất khôi phục."],
-        ["RPO theo mốc dữ liệu đã đối chiếu", liveMetrics.rpo, false, "Cần mốc bắt đầu lỗi và dữ liệu phục hồi đã đối chiếu."],
-        ["Thời gian phát hiện", liveMetrics.detection, false, "Cần mốc bắt đầu lỗi và phát hiện lỗi."],
-        ["Thời gian chuyển sang dự phòng", liveMetrics.failover.value, liveMetrics.failover.live, "Cần mốc bắt đầu failover và Standby tiếp quản."],
-      ].map(([name, value, running, missing]) => <div className="stat-card" key={name}><span>{name}</span><strong>{duration(value)}</strong>
-        <small>{running ? "Đang đo — chưa chốt kết quả." : value == null ? missing : "Tính từ các mốc đã ghi nhận."}</small></div>)}</div>
-      <p className="panel-padding muted">RTO = khôi phục − bắt đầu lỗi. RPO = bắt đầu lỗi − mốc dữ liệu cuối đã phục hồi và đối chiếu. Phát hiện = phát hiện − bắt đầu lỗi. Chuyển máy = tiếp quản − bắt đầu failover. Thiếu mốc sẽ hiện “Chưa đo”. Sai số quan sát chịu ảnh hưởng chu kỳ kiểm tra và thời gian phản hồi.</p>
+    <Panel title="3. Recovery Metrics" subtitle="Tự ghi số đo khi phát hiện sự cố và kiểm tra API qua Gateway; bộ đếm chạy mỗi giây, trạng thái lấy lại mỗi 10 giây." action={<Activity size={20} />}>
+      <div className="monitor-summary">
+        <strong>{selected ? "Đang xem lần đo đã chọn" : "Tự động — lần đo mới nhất"}</strong>
+        {incident && <span>{date(incident.timeline.find(e => e.stage === "detected")?.at)} · {incident.id.slice(0, 8)}</span>}
+        {selected && <button className="button" onClick={() => setSelected("")}>Theo dõi mới nhất</button>}
+      </div>
+      {!incident ? <p className="panel-padding muted">Monitoring sẽ tự tạo lần đo khi quan sát Primary từ Healthy sang lỗi hoặc Gateway chuyển từ Primary sang Standby.</p> : <>
+        <div className="monitor-summary monitor-live-recovery">
+          <strong>{measurement.state}{measurement.live ? ": " + duration(measurement.apiRto) : ""}</strong>
+          {measurement.recoveredAt && <span>Gateway xác nhận {measurement.recoveredInstance === "standby" ? "Standby" : "Primary"} Healthy lúc {date(measurement.recoveredAt)}.</span>}
+          <small>{stale ? "Đang mất dữ liệu Monitoring mới; bộ đếm tạm dừng. " : ""}Kết quả tự động là số đo quan sát API, chưa chứng minh giao dịch ghi và dữ liệu đã phục hồi đầy đủ.</small>
+        </div>
+        <div className="stats-grid compact monitor-metrics">{[
+          ["RTO API — từ lúc phát hiện", duration(measurement.apiRto), measurement.live ? "Đang đo; tự chốt khi Gateway trả API Healthy." : "Phát hiện sự cố → API Healthy qua Gateway."],
+          ["RPO dữ liệu", measurement.rpo == null ? "Chưa xác minh" : duration(measurement.rpo), measurement.rpo == null ? "Chưa có đối chiếu giao dịch tự động. Độ trễ replication không phải RPO." : "Giữ kết quả đối chiếu dữ liệu của bản ghi lịch sử."],
+          ["Cửa sổ phát hiện lỗi", measurement.detectionWindow == null ? "Không có mẫu trước lỗi" : "≤ " + duration(measurement.detectionWindow), "Khoảng từ lần Primary Healthy cuối đến lần kiểm tra phát hiện lỗi; không phải giờ gây lỗi chính xác."],
+          ["Chuyển Gateway — quan sát", measurement.gatewaySwitch == null ? "Không có mẫu trước chuyển" : (measurement.gatewayBound ? "≤ " : "") + duration(measurement.gatewaySwitch), measurement.gatewayBound ? "Cận trên từ mẫu Gateway phục vụ Primary cuối đến API phục hồi." : "Từ lần Gateway mất sẵn sàng đến khi API phục hồi; không phải thời điểm chạy lệnh failover."],
+        ].map(([name, value, note]) => <div className="stat-card" key={name}><span>{name}</span><strong>{value}</strong><small>{note}</small></div>)}</div>
+        <p className="panel-padding muted">Nếu phát hiện lỗi và API dự phòng Healthy trong cùng lượt kiểm tra, RTO API quan sát có thể là 0 giây. Bản cũ thiếu mẫu không được tự điền thời gian. Hệ thống chỉ đo và lưu lịch sử, không tự chuyển quyền ghi database.</p>
+      </>}
     </Panel>
-    <Panel title="4. Incident Timeline" subtitle="Lưu bởi Monitoring độc lập; vẫn ghi khi Backend Primary mất kết nối. Không tự thực hiện failover." action={<Clock size={20} />}>
+    <Panel title="4. Lịch sử các lần đo" subtitle="Mỗi sự cố có bản ghi riêng, lưu tại Monitoring và giữ qua các lần khởi động lại. Chọn Xem để đối chiếu số đo cũ." action={<Clock size={20} />}>
       {monitor?.persistence_error && <ErrorBox error="Nhật ký có lỗi đọc/ghi. Chưa thể bảo đảm dữ liệu đã được lưu đầy đủ." />}
-      {incident ? <>
-        <ol className="timeline">{Object.entries(labels).map(([stage, label]) => {
-          const entry = incident.timeline.find((e) => e.stage === stage);
-          return <li key={stage}><strong>{label}</strong><p>{entry ? date(entry.at) : "Chưa ghi nhận"}</p>
-            {entry && <p>{entry.source === "operator" ? "Người vận hành" : entry.source === "gateway" ? "Quan sát Gateway" : "Kiểm tra tự động"} · {entry.note}</p>}</li>;
-        })}</ol>
-        <form className="order-form monitor-form" onSubmit={save} key={incident.id}>
-          <h4>Bổ sung mốc thực tế</h4><p className="muted">Nhập giờ xảy ra sự kiện theo bằng chứng. Thời gian trên form theo múi giờ máy bạn; dữ liệu lưu UTC. Mốc đã lưu không được ghi đè.</p>
-          <ErrorBox error={saveError} />
-          <fieldset disabled={busy || stale}><label>Mốc sự kiện<select name="stage" required>
-            {Object.entries(labels).filter(([key]) => key !== "detected" && !incident.timeline.some((e) => e.stage === key)).map(([key, text]) => <option key={key} value={key}>{text}</option>)}
-          </select></label><label>Thời điểm xảy ra<input type="datetime-local" name="at" step="0.001" required /></label>
-          <label>Mốc dữ liệu cuối đã phục hồi và đối chiếu (chỉ khi hoàn tất khôi phục)<input type="datetime-local" name="verified_data_at" step="0.001" /></label>
-          <label>Ghi chú / bằng chứng<textarea name="note" required maxLength={500} /></label></fieldset>
-          <button className="button primary" disabled={busy || stale || incident.timeline.length >= 5}>{busy ? "Đang lưu…" : "Lưu mốc thời gian"}</button>
-        </form>
-      </> : <p className="panel-padding muted">Chưa ghi nhận sự cố thực tế. Monitoring tạo timeline khi quan sát Primary chuyển từ Healthy sang lỗi; sự cố Demo không được dùng để tính số đo thực tế.</p>}
+      <div className="monitor-summary"><strong>Đã lưu {incidents.length} lần đo</strong></div>
+      {incidents.length ? <>
+        <div className="table-scroll"><table><thead><tr><th>PHÁT HIỆN / MÃ</th><th>TRẠNG THÁI</th><th>API PHỤC HỒI</th><th>RTO API</th><th>CỬA SỔ PHÁT HIỆN</th><th>CHUYỂN GATEWAY</th><th>RPO DỮ LIỆU</th><th></th></tr></thead>
+          <tbody>{incidents.slice(page * 10, page * 10 + 10).map(i => {
+            const m = automaticRecoveryMetrics(i, serverNow, stale);
+            return <tr key={i.id}><td>{date(i.timeline.find(e => e.stage === "detected")?.at)}<br /><small>{i.id.slice(0, 8)}{i.restored_from_history ? " · Từ nhật ký" : ""}</small></td>
+              <td>{m.state}</td><td>{date(m.recoveredAt)}{m.recoveredInstance ? " · " + m.recoveredInstance : ""}</td>
+              <td>{duration(m.apiRto)}{m.live ? " (đang đo)" : ""}</td>
+              <td>{m.detectionWindow == null ? "—" : "≤ " + duration(m.detectionWindow)}</td>
+              <td>{m.gatewaySwitch == null ? "—" : (m.gatewayBound ? "≤ " : "") + duration(m.gatewaySwitch)}</td>
+              <td>{m.rpo == null ? "Chưa xác minh" : duration(m.rpo)}</td>
+              <td><button className="button" onClick={() => setSelected(i.id)} aria-label={"Xem lần đo " + i.id.slice(0, 8)}>Xem</button></td></tr>;
+          })}</tbody></table></div>
+        <div className="monitor-summary"><button className="button" disabled={page === 0} onClick={() => setHistoryPage(page - 1)}>Trước</button><span>Trang {page + 1} / {Math.ceil(incidents.length / 10)}</span><button className="button" disabled={(page + 1) * 10 >= incidents.length} onClick={() => setHistoryPage(page + 1)}>Sau</button></div>
+        {selected && incident && <details className="panel-padding" key={incident.id} open><summary>Chi tiết bản ghi {incident.id.slice(0, 8)}</summary>
+          {incident.restored_from_history && <p className="muted">Khôi phục từ nhật ký quan sát; không suy diễn các mốc chưa có bằng chứng.</p>}
+          <ol className="timeline">{incident.timeline.map(e => <li key={e.stage}><strong>{labels[e.stage] || e.stage}</strong><p>{date(e.at)} · {e.note}</p></li>)}</ol>
+        </details>}
+      </> : <p className="panel-padding muted">Chưa có lần đo. Giữ Monitoring chạy từ lúc Primary còn Healthy để quan sát sự cố tiếp theo.</p>}
       <details className="panel-padding"><summary>Lịch sử chuyển trạng thái máy chủ</summary>
-        <ol className="timeline">{[...(monitor?.events || [])].reverse().map((e) => <li key={e.id}><strong>{e.component}: {e.from} → {e.status}</strong><p>{date(e.created_at)}</p></li>)}</ol>
+        <ol className="timeline">{[...(monitor?.events || [])].reverse().map(e => <li key={e.id}><strong>{e.component}: {e.from} → {e.status}</strong><p>{date(e.created_at)}</p></li>)}</ol>
       </details>
     </Panel>
     <ErrorBox error={runtime.error} />

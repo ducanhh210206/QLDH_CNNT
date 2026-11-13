@@ -47,14 +47,32 @@ export function observeIncidents(incidents, previous, next, at) {
     }
     current = { id: randomUUID(), mode: "Live", component: "Backend Primary", verified_data_at: null,
       trigger: outage ? "primary_outage" : "gateway_switch",
+      observation: {
+        primary_last_healthy_at: outage ? old?.checked_at || null : null,
+        gateway_last_primary_at: activeInstance(previous) === "primary"
+          ? previous.find(c => c.name === "API Gateway")?.checked_at || null : null,
+      },
       timeline: [{ stage: "detected", at, source: outage ? "probe" : "gateway",
         note: outage ? "Lần kiểm tra đầu tiên ghi nhận Primary không sẵn sàng."
           : "Quan sát Gateway chuyển từ Primary sang Standby; chưa xác nhận thời điểm xảy ra lỗi." }] };
     incidents.unshift(current);
   }
+  if (current && !current.api_recovered_at) {
+    const gateway = next.find(c => c.name === "API Gateway");
+    if (gateway && ["Offline", "Unhealthy"].includes(gateway.status)) {
+      current.observation ||= {};
+      current.observation.gateway_unavailable_at ||= at;
+    }
+  }
   if (current && activeInstance(next) === "standby" && !current.timeline.some((e) => e.stage === "standby_active"))
     current.timeline.push({ stage: "standby_active", at, source: "gateway", note: "Gateway trả readiness Healthy từ instance standby; chưa xác nhận an toàn quyền ghi database." });
+  if (current && activeInstance(next) === "standby" && !current.api_recovered_at) {
+    current.api_recovered_at = current.timeline.find(e => e.stage === "standby_active").at;
+    current.api_recovered_instance = "standby";
+  }
   if (current && primary?.status === "Healthy" && activeInstance(next) === "primary") {
+    current.api_recovered_at ||= at;
+    current.api_recovered_instance ||= "primary";
     current.tracking_closed_at = at;
     current.tracking_close_reason = "primary_active";
   }

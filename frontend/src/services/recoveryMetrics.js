@@ -22,3 +22,28 @@ export function liveRecoveryMetrics(incident, now, stale = false) {
     standbyObserved: Number.isFinite(times.standby_active),
   };
 }
+
+export function automaticRecoveryMetrics(incident, now, stale = false) {
+  const time = Object.fromEntries((incident?.timeline || []).map(e => [e.stage, Date.parse(e.at)]));
+  const delta = (end, start) => Number.isFinite(end) && Number.isFinite(start) && end >= start ? end - start : null;
+  const recovered = Date.parse(incident?.api_recovered_at ||
+    incident?.timeline?.find(e => e.stage === 'standby_active')?.at);
+  const pending = !!incident && !Number.isFinite(recovered) && !incident.tracking_closed_at;
+  const end = Number.isFinite(recovered) ? recovered : !stale && pending ? now : NaN;
+  const unavailable = Date.parse(incident?.observation?.gateway_unavailable_at);
+  const lastPrimary = Date.parse(incident?.observation?.gateway_last_primary_at);
+  const gatewayStart = Number.isFinite(unavailable) ? unavailable : lastPrimary;
+  return {
+    apiRto: delta(end, time.detected),
+    live: pending && !stale,
+    detectionWindow: delta(time.detected, Date.parse(incident?.observation?.primary_last_healthy_at)),
+    gatewaySwitch: delta(end, gatewayStart),
+    gatewayBound: !Number.isFinite(unavailable),
+    // Legacy verified evidence remains readable, but replication lag is not RPO.
+    rpo: delta(time.fault_started, Date.parse(incident?.verified_data_at)),
+    recoveredAt: Number.isFinite(recovered) ? new Date(recovered).toISOString() : null,
+    recoveredInstance: incident?.api_recovered_instance || (Number.isFinite(time.standby_active) ? 'standby' : null),
+    state: Number.isFinite(recovered) ? 'API đã phục hồi' : incident?.tracking_closed_at
+      ? 'Đã kết thúc theo dõi' : stale ? 'Mất dữ liệu giám sát mới' : 'Đang đo',
+  };
+}
