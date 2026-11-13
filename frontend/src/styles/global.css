@@ -1991,6 +1991,14 @@ textarea:focus{outline:2px solid #087e7233;border-color:var(--teal)}
 /* Monitoring: four readable sections and responsive evidence controls. */
 .monitoring-page { display: grid; gap: 24px; min-width: 0; }
 .monitoring-page > .panel { min-width: 0; }
+.monitor-active-line { display: flex; align-items: flex-start; gap: 14px; padding: 20px 24px; border: 1px solid var(--line); border-left: 5px solid var(--muted); border-radius: 12px; background: var(--soft); color: var(--text); overflow-wrap: anywhere; }
+.monitor-active-line > svg { flex-shrink: 0; color: var(--muted); }
+.monitor-active-line strong { font-size: 18px; }
+.monitor-active-line p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+.monitor-active-line.is-primary { border-left-color: var(--teal); }
+.monitor-active-line.is-primary > svg { color: var(--teal); }
+.monitor-active-line.is-standby { border-left-color: #bd7a14; }
+.monitor-active-line.is-standby > svg { color: #bd7a14; }
 .monitor-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; padding: 20px 24px; }
 .monitor-services { padding: 0 24px 24px; }
 .monitor-service { border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-wrap: anywhere; }

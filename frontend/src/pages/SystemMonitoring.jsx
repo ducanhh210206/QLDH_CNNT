@@ -19,6 +19,8 @@ export default function SystemMonitoring() {
   const replication = monitor?.replication;
   const checked = Date.parse(monitor?.checked_at);
   const stale = !!status.error || !Number.isFinite(checked) || Date.now() - checked > Math.max(30000, (monitor?.poll_interval_ms || 10000) * 2 + 10000);
+  const active = !stale && ["primary", "standby"].includes(monitor?.active_instance)
+    ? monitor.active_instance : null;
   const components = monitor?.components?.length ? monitor.components : [
     { name: "Backend đang phục vụ trang này", ...data?.backend },
     { name: "Backend Primary", status: "Unknown" },
@@ -44,11 +46,18 @@ export default function SystemMonitoring() {
     <PageHeading title="Giám sát hệ thống" description="Theo dõi máy chủ, đồng bộ dữ liệu và thời gian khôi phục mỗi 10 giây.">
       <Refresh onClick={refresh} />
     </PageHeading>
+    <div className={`monitor-active-line${active ? " is-" + active : ""}`} role="status" aria-live="polite">
+      <Server size={22} aria-hidden="true" />
+      <div><strong>{active === "primary" ? "Đang phục vụ qua Gateway: PRIMARY — Máy chính"
+        : active === "standby" ? "Đang phục vụ qua Gateway: STANDBY — Máy dự phòng"
+        : "Đang phục vụ qua Gateway: Chưa xác định"}</strong>
+        <p>{active ? "Kiểm tra cuối: " + date(monitor?.checked_at)
+          : "Chưa có xác nhận mới từ Monitoring và Gateway. Bấm Làm mới để kiểm tra."}</p>
+      </div>
+    </div>
     <ErrorBox error={status.error || monitor?.message} retry={refresh} />
     {stale && <div className="notice">Chưa có dữ liệu giám sát mới. Trạng thái dưới đây có thể đã cũ; chưa thể xác nhận máy đang Active.</div>}
     <Panel title="1. Server Status" subtitle="Active được xác định từ instance trả về qua API Gateway; không suy đoán từ việc máy còn chạy." action={<Server size={20} />}>
-      <div className="monitor-summary"><strong>Đang Active: {stale ? "Chưa xác định" : monitor?.active_instance || "Chưa xác định"}</strong>
-        <span>Kiểm tra cuối: {date(monitor?.checked_at)}</span></div>
       <div className="service-grid monitor-services">{components.map((c) => <div className="monitor-service" key={c.name}>
         <h4>{c.name}</h4><Badge status={stale ? "Unknown" : c.status || "Unknown"} />
         <p>Database: {c.database || "Chưa xác định"}</p>
