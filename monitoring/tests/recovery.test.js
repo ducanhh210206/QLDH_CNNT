@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics } from '../src/recovery.js';
+import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics, sortIncidents, reconcileIncidentHistory } from '../src/recovery.js';
 import { replicationSnapshot } from '../src/replication.js';
 const at = '2026-11-09T01:00:10.000Z';
 const healthy = [{ name: 'Backend Primary', status: 'Healthy' }];
@@ -72,4 +72,33 @@ test('return to Primary closes tracking without claiming recovery; next switch s
   assert.notEqual(incidents[0].id,id);
   assert.equal(incidents[0].trigger,'gateway_switch');
   assert.equal(incidents[0].timeline.some(e=>e.stage==='fault_started'),false);
+});
+
+test('startup restores missing detections from evidence, preserves legacy history and is idempotent', () => {
+  const old = {id:'legacy',timeline:[{stage:'detected',at:'2026-11-01T00:00:00.009Z'}]};
+  const history = [
+    {id:'legacy-event',component:'Backend Primary',from:'Healthy',status:'Offline',created_at:'2026-11-01T00:00:00Z'},
+    {id:'missed',component:'Backend Primary',from:'Healthy',status:'Offline',created_at:at},
+    {id:'boot',component:'Backend Primary',from:'Unknown',status:'Offline',created_at:'2026-11-09T01:00:15Z'},
+  ];
+  let incidents = reconcileIncidentHistory([old],history);
+  assert.equal(incidents.length,2);
+  assert.equal(incidents[0].detection_event_id,'missed');
+  assert.equal(incidents[0].timeline.length,1);
+  assert.equal(incidents[0].timeline[0].at,at);
+  assert.equal(incidents[1].id,'legacy');
+  assert.equal(incidents[1].tracking_closed_at,at);
+  assert.deepEqual(Object.values(recoveryMetrics(incidents[0])),[null,null,null,null,null]);
+  const saved = JSON.stringify(incidents);
+  incidents = reconcileIncidentHistory(incidents,history);
+  assert.equal(JSON.stringify(incidents),saved);
+});
+
+test('more than 100 incidents remain available and edits to an old incident do not make it newest', () => {
+  const incidents = Array.from({length:105},(_,n)=>({id:String(n),timeline:[{stage:'detected',at:new Date(Date.parse(at)+n*10000).toISOString()}]}));
+  const sorted = sortIncidents(incidents);
+  assert.equal(sorted[0].id,'104');
+  const next = observeIncidents(sorted,offline,offline,'2026-11-09T02:00:00Z');
+  assert.equal(next.length,105);
+  assert.equal(next.at(-1).id,'0');
 });
