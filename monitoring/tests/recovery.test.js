@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics, sortIncidents, reconcileIncidentHistory } from '../src/recovery.js';
 import { replicationSnapshot } from '../src/replication.js';
+import { createRecoveryProbes } from '../src/recoveryProbes.js';
 const at = '2026-11-09T01:00:10.000Z';
 const healthy = [{ name: 'Backend Primary', status: 'Healthy' }];
 const offline = [{ name: 'Backend Primary', status: 'Offline' }];
@@ -128,4 +129,24 @@ test('retains the last Gateway Primary sample across an unavailable poll', () =>
   const [incident] = observeIncidents([], previous, next, at, sampleAt);
   assert.equal(incident.observation.gateway_last_primary_at, sampleAt);
   assert.equal(incident.api_recovered_instance, 'standby');
+});
+
+test('automatic RPO stops at the first missing probe and excludes samples after detection', async () => {
+  const samples = [0, 3, 6, 12].map(second => ({
+    id: String(second),
+    at: new Date(Date.parse(at) - 10000 + second * 1000).toISOString(),
+  }));
+  const probes = createRecoveryProbes({
+    gateway:'https://gateway.example',
+    token:'test-only-monitor-token-32-characters',
+    fetchProbe: async (url, options) => {
+      assert.match(url, /\/check$/);
+      assert.deepEqual(JSON.parse(options.body).ids, ['0', '3', '6']);
+      return Response.json({instance:'standby',ids:['0','6']});
+    },
+  });
+  const result = await probes.verify({timeline:[{stage:'detected',at}]}, samples);
+  assert.equal(result.probe_id,'0');
+  assert.equal(result.rpo_ms,10000);
+  assert.equal(result.missing,1);
 });

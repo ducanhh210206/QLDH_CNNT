@@ -77,3 +77,10 @@ INSERT INTO schema_migrations(version) VALUES ('004_product_stock');
 
 ALTER TABLE products ADD COLUMN version INT UNSIGNED NOT NULL DEFAULT 1;
 INSERT INTO schema_migrations(version) VALUES ('005_product_edit');
+
+CREATE TABLE recovery_probes (
+  id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  INDEX (created_at)
+) ENGINE=InnoDB;
+INSERT INTO schema_migrations(version) VALUES ('006_recovery_probes');

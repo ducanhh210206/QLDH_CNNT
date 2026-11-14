@@ -15,7 +15,17 @@ Mục 4 hiển thị tổng số lần đã lưu, sắp theo **giờ phát hiệ
 
 Lưu bền vững trên máy chạy Monitoring tại `monitoring/data/recovery.jsonl` (hoặc MONITOR_DATA_DIR nếu cấu hình). Tất cả bản ghi được giữ qua khởi động lại; không còn cắt danh sách ở 100 sự cố. Cần giữ volume/thư mục này khi cập nhật code. Nhật ký health trong `incidents.jsonl` cũng cần được giữ. Khi nâng cấp, Monitoring có thể tạo lại các bản ghi phát hiện lỗi bị bỏ sót từ 100 chuyển trạng thái gần nhất đã lưu; không tạo trùng và không tự suy diễn giờ bắt đầu lỗi/tiếp quản/khôi phục. Khi chỉ thấy Primary Offline ở lần kiểm tra đầu tiên sau khởi động và không có nhật ký trước đó, không thể biết giờ bắt đầu sự cố.
 
-RTO API đo từ lúc phát hiện tới lúc API qua Gateway trả Healthy. Hai mốc trong cùng lượt kiểm tra có thể cho kết quả 0 giây. Cửa sổ phát hiện tính từ lần kiểm tra Primary Healthy cuối tới lần phát hiện lỗi. Thời gian chuyển Gateway dựa trên các mẫu Gateway có sẵn. Khi thiếu dữ liệu Monitoring mới, bộ đếm trực tiếp tạm dừng. RPO hiển thị **Chưa xác minh** khi chưa có bằng chứng đối chiếu dữ liệu. Các bản ghi lịch sử có RPO đã xác minh vẫn hiển thị kết quả cũ.
+RTO API đo từ lúc phát hiện tới lúc API qua Gateway trả Healthy. Hai mốc trong cùng lượt kiểm tra có thể cho kết quả 0 giây. Cửa sổ phát hiện tính từ lần kiểm tra Primary Healthy cuối tới lần phát hiện lỗi. Thời gian chuyển Gateway dựa trên các mẫu Gateway có sẵn. Khi thiếu dữ liệu Monitoring mới, bộ đếm trực tiếp tạm dừng.
+
+Sau khi đối chiếu dữ liệu trên Standby, vào mục 3, mở **Xác minh RPO dữ liệu** và ghi giờ bắt đầu lỗi thực tế, giờ lưu giao dịch mới nhất trước lỗi đã đối chiếu, cùng mã giao dịch và kết quả đối chiếu. Nếu cần bổ sung lần đo cũ, bấm **Xem** ở mục 4 trước khi ghi. RPO bằng giờ bắt đầu lỗi trừ giờ lưu giao dịch đã đối chiếu. Kết quả được lưu vào lần đo đã chọn.
+
+## Bật RPO tự động cho buổi diễn tập
+
+1. Áp dụng migration `006_recovery_probes` trên MySQL Primary bằng `npm run db:migrate` với cấu hình kết nối tới đúng database. Nếu Standby là MySQL replica, chờ bảng `recovery_probes` được replicate. Nếu hai backend dùng chung database, chạy migration một lần. Với một database Standby độc lập có thể ghi, áp dụng migration vào database đó để chuẩn bị trước buổi diễn tập.
+2. Cập nhật frontend, backend Primary, backend Standby và Monitoring. Đặt `RPO_PROBE_ENABLED=true` trên hai backend và Monitoring, dùng cùng `MONITOR_TOKEN` và giữ `GATEWAY_URL` trỏ đến Gateway thực sự phục vụ cả hai backend. Khởi động lại các tiến trình đã đổi cấu hình.
+3. Giữ Gateway phục vụ từ Primary và đợi mục 3 báo có lần Primary xác nhận giao dịch kiểm chứng. Sau đó mới gây lỗi và chờ Gateway phục vụ từ Standby. Monitoring đối chiếu các bản ghi qua Standby và lưu kết quả vào lần đo.
+
+Monitoring giữ tối đa 120 mẫu Primary đã xác nhận trong 30 phút gần nhất, theo chu kỳ lấy mẫu. Sau khi chuyển máy, nó chọn bản ghi cuối trong dãy còn đủ dữ liệu trên Standby, dừng ở bản ghi bị thiếu đầu tiên. Nếu không có mẫu phù hợp, giao diện hiện **Chưa xác minh**. RPO quan sát mặc định dùng giờ phát hiện lỗi và chỉ phản ánh các giao dịch kiểm chứng. Mốc giờ được ghi lúc Monitoring nhận xác nhận từ Primary. Kết quả đối chiếu thủ công vẫn có thể lưu khi chưa có số đo.
 
 ## Cập nhật trên Windows
 

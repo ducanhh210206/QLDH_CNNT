@@ -13,7 +13,7 @@ export const metrics = (req, res) =>
 export const milestone = async (req, res) => {
   const id = validId(req.params.id);
   const body = parse(z.object({
-    stage: z.enum(["fault_started", "failover_started", "standby_active", "recovered"]),
+    stage: z.enum(["fault_started", "failover_started", "standby_active", "recovered", "rpo_verified"]),
     at: z.iso.datetime(), note: z.string().trim().min(1).max(500),
     verified_data_at: z.iso.datetime().optional(),
   }).strict(), req.body);
@@ -24,6 +24,10 @@ export const milestone = async (req, res) => {
       body: JSON.stringify(body), signal: AbortSignal.timeout(4000),
     });
   } catch { fail(503, "MONITOR_UNAVAILABLE", "Không kết nối được Monitoring để lưu mốc thời gian."); }
-  if (!response.ok) fail(400, "INVALID_MILESTONE", "Không lưu được mốc. Kiểm tra thứ tự thời gian; mốc đã lưu không thể ghi đè.");
+  if (!response.ok) {
+    if (response.status !== 400) fail(503, "MONITOR_UNAVAILABLE", "Monitoring chưa sẵn sàng để lưu mốc thời gian.");
+    const result = await response.json().catch(() => null);
+    fail(400, "INVALID_MILESTONE", result?.message || "Không lưu được mốc. Kiểm tra thứ tự thời gian và trạng thái bản ghi.");
+  }
   res.json({ status: "Saved" });
 };

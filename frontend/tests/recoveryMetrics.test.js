@@ -66,3 +66,26 @@ test('direct switch uses a sampling upper bound, while missing history stays unk
   assert.equal(unknown.apiRto,null);
   assert.equal(unknown.live,false);
 });
+
+test('verified transaction evidence shows zero RPO without changing observed API recovery', () => {
+  const i = {
+    timeline: [event('fault_started', 5), event('detected', 10), event('standby_active', 12)],
+    verified_data_at: event('', 5).at,
+  };
+  const measurement = automaticRecoveryMetrics(i, start + 20000);
+  assert.equal(measurement.rpo, 0);
+  assert.equal(measurement.apiRto, 2000);
+});
+
+test('automatic RPO is marked as observed and keeps manual evidence authoritative', () => {
+  const incident = {timeline:[event('fault_started',8),event('detected',10)],rpo_observation:{
+    status:'verified',reference_at:event('',10).at,verified_at:event('',7).at,
+  }};
+  const sample = automaticRecoveryMetrics(incident,start+20000);
+  assert.equal(sample.rpo,3000);
+  assert.equal(sample.rpoObserved,true);
+  incident.verified_data_at=event('',8).at;
+  const verified = automaticRecoveryMetrics(incident,start+20000);
+  assert.equal(verified.rpo,0);
+  assert.equal(verified.rpoObserved,false);
+});
