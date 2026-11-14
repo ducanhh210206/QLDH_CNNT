@@ -21,12 +21,13 @@ try {
     "003_notifications",
     "004_product_stock",
     "005_product_edit",
+    "006_recovery_probes",
   ];
   const pending = migrations.filter(
     (version) => !versions.some((row) => row.version === version),
   );
   if (!pending.length) {
-    console.log("Schema hiện tại đã được áp dụng (002, 003, 004 và 005).");
+    console.log("Các migration hiện tại đã được áp dụng.");
   } else {
     if (!versions.some((r) => r.version === "001_initial"))
       throw Error("Cần schema 001 trước.");

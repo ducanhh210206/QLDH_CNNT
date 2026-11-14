@@ -5,6 +5,7 @@ import { app } from "../src/app.js";
 import jwt from "jsonwebtoken";
 import { env } from "../src/config/env.js";
 import { pool } from "../src/config/database.js";
+import { randomUUID } from "node:crypto";
 after(() => pool.end());
 test("liveness is independent of MySQL", async () => {
   const r = await request(app).get("/health/live");
@@ -28,6 +29,40 @@ test("all business and admin routes require authentication", async () => {
 test("invalid JWT cannot access APIs", async () => {
   const r = await request(app).get("/api/orders").set("Cookie", "omdrs=forged");
   assert.equal(r.status, 401);
+});
+
+test("RPO probes require the monitor token and write only on Primary", async (t) => {
+  const previous = { rpoProbeEnabled: env.rpoProbeEnabled, instance: env.instance, monitorToken: env.monitorToken };
+  t.after(() => Object.assign(env, previous));
+  const path = "/api/monitoring/recovery-probes";
+  const id = randomUUID();
+  env.rpoProbeEnabled = false;
+  assert.equal((await request(app).post(path).send({ id })).status, 404);
+  env.rpoProbeEnabled = true;
+  env.monitorToken = "test-only-monitor-token-32-characters";
+  const bearer = "Bearer " + env.monitorToken;
+  assert.equal((await request(app).post(path).send({ id })).status, 401);
+  env.instance = "standby";
+  assert.equal((await request(app).post(path).set("Authorization", bearer).send({ id })).status, 409);
+  t.mock.method(pool, "execute", async (_sql, values) => {
+    assert.deepEqual(values, [id]);
+    return [[{ id }]];
+  });
+  const checked = await request(app).post(path + "/check").set("Authorization", bearer).send({ ids: [id] });
+  assert.deepEqual(checked.body, { instance: "standby", ids: [id] });
+  env.instance = "primary";
+  const connection = {
+    beginTransaction: async () => {},
+    execute: async () => {},
+    commit: async () => {},
+    release: () => {},
+  };
+  t.mock.method(pool, "getConnection", async () => connection);
+  const commit = t.mock.method(connection, "commit");
+  const written = await request(app).post(path).set("Authorization", bearer).send({ id });
+  assert.deepEqual(written.body, { instance: "primary", id });
+  assert.equal(commit.mock.callCount(), 1);
+  assert.equal((await request(app).post(path + "/check").set("Authorization", bearer).send({ ids: [id] })).status, 409);
 });
 test("untrusted origins cannot mutate data", async () => {
   const r = await request(app)

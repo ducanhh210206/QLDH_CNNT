@@ -33,14 +33,19 @@ export function automaticRecoveryMetrics(incident, now, stale = false) {
   const unavailable = Date.parse(incident?.observation?.gateway_unavailable_at);
   const lastPrimary = Date.parse(incident?.observation?.gateway_last_primary_at);
   const gatewayStart = Number.isFinite(unavailable) ? unavailable : lastPrimary;
+  const verifiedRpo = delta(time.fault_started, Date.parse(incident?.verified_data_at));
+  const observation = incident?.rpo_observation;
+  const observedRpo = observation?.status === "verified"
+    ? delta(Date.parse(observation.reference_at), Date.parse(observation.verified_at))
+    : null;
   return {
     apiRto: delta(end, time.detected),
     live: pending && !stale,
     detectionWindow: delta(time.detected, Date.parse(incident?.observation?.primary_last_healthy_at)),
     gatewaySwitch: delta(end, gatewayStart),
     gatewayBound: !Number.isFinite(unavailable),
-    // Legacy verified evidence remains readable, but replication lag is not RPO.
-    rpo: delta(time.fault_started, Date.parse(incident?.verified_data_at)),
+    rpo: verifiedRpo ?? observedRpo,
+    rpoObserved: verifiedRpo == null && observedRpo != null,
     recoveredAt: Number.isFinite(recovered) ? new Date(recovered).toISOString() : null,
     recoveredInstance: incident?.api_recovered_instance || (Number.isFinite(time.standby_active) ? 'standby' : null),
     state: Number.isFinite(recovered) ? 'API đã phục hồi' : incident?.tracking_closed_at

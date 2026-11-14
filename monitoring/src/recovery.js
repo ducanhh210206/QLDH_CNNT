@@ -104,6 +104,31 @@ export function recordMilestone(incident, input, now = Date.now()) {
   }
   return { ...incident, timeline: events, verified_data_at: verified };
 }
+
+export function verifyRecoveryPoint(incident, input, now = Date.now()) {
+  const faultAt = Date.parse(input.at);
+  const dataAt = Date.parse(input.verified_data_at);
+  const detected = detectedAt(incident);
+  const note = typeof input.note === "string" ? input.note.trim() : "";
+  if (!Number.isFinite(faultAt) || !Number.isFinite(dataAt) || !Number.isFinite(detected)
+      || faultAt > now || faultAt > detected || dataAt > faultAt || !note || note.length > 500) {
+    throw new Error("Nhập giờ giao dịch không muộn hơn giờ bắt đầu lỗi, giờ bắt đầu lỗi không muộn hơn giờ phát hiện và ghi chú đối chiếu.");
+  }
+  const fault = incident.timeline.find(event => event.stage === "fault_started");
+  if (fault && Date.parse(fault.at) !== faultAt) {
+    throw new Error("Giờ bắt đầu lỗi phải khớp với mốc đã lưu.");
+  }
+  if (incident.verified_data_at) {
+    if (Date.parse(incident.verified_data_at) === dataAt && incident.rpo_verification?.note === note) return incident;
+    throw new Error("Lần đo này đã có kết quả đối chiếu RPO.");
+  }
+  const updated = fault ? incident : recordMilestone(incident, { stage: "fault_started", at: input.at, note }, now);
+  return {
+    ...updated,
+    verified_data_at: new Date(dataAt).toISOString(),
+    rpo_verification: { note, recorded_at: new Date(now).toISOString() },
+  };
+}
 export function recoveryMetrics(incident) {
   const time = Object.fromEntries((incident?.timeline || []).map((e) => [e.stage, Date.parse(e.at)]));
   const difference = (end, start) => Number.isFinite(end) && Number.isFinite(start) && end >= start ? end - start : null;

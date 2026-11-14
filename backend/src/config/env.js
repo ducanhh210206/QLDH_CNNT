@@ -57,6 +57,7 @@ export const env = {
   },
   monitor: process.env.MONITOR_URL || "http://127.0.0.1:5001",
   monitorToken: process.env.MONITOR_TOKEN || "",
+  rpoProbeEnabled: process.env.RPO_PROBE_ENABLED === "true",
   backups: process.env.BACKUP_DIR
     ? resolve(process.env.BACKUP_DIR)
     : resolve(

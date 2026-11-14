@@ -22,6 +22,7 @@ const tables = [
   "oauth_login_attempts",
   "products",
   "notification_reads",
+  "recovery_probes",
 ];
 let busy = false;
 export async function listBackups() {
@@ -56,6 +57,13 @@ export async function createBackup(userId = null) {
       "-- OMDRS consistent logical backup v1; UTC; application tables only\n";
     const snapshot = {};
     for (const table of tables) {
+      if (table === "recovery_probes") {
+        const [existing] = await c.execute(
+          "SELECT 1 FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?",
+          [table],
+        );
+        if (!existing.length) continue;
+      }
       const [ddl] = await c.query("SHOW CREATE TABLE `" + table + "`");
       sql += ddl[0]["Create Table"] + ";\n";
       const [rows] = await c.query("SELECT * FROM `" + table + "`");
@@ -84,7 +92,7 @@ export async function createBackup(userId = null) {
       created_at: new Date().toISOString(),
       sha256: hash,
       tables: Object.fromEntries(
-        tables.map((t) => [
+        Object.keys(snapshot).map((t) => [
           t,
           { count: snapshot[t].length, sha256: digest(snapshot[t]) },
         ]),
@@ -180,8 +188,9 @@ export async function restoreBackup(backupId, userId, confirmation) {
       backup_created_at: manifest.created_at,
       tables: {},
     };
-    // Historical schema-002 backups have no notification read receipts.
-    for (const table of tables.filter(table => table !== "notification_reads" || manifest.tables[table])) {
+    // Historical backups may predate notification receipts or recovery probes.
+    for (const table of tables.filter(table =>
+      !["notification_reads", "recovery_probes"].includes(table) || manifest.tables[table])) {
       const [rows] = await c.query("SELECT * FROM `" + table + "`");
       report.tables[table] = {
         count: rows.length,

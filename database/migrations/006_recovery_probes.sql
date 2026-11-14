@@ -1,0 +1,5 @@
+CREATE TABLE recovery_probes (
+  id CHAR(36) CHARACTER SET ascii COLLATE ascii_bin PRIMARY KEY,
+  created_at DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  INDEX (created_at)
+) ENGINE=InnoDB;

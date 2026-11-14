@@ -34,6 +34,7 @@ services:
     environment:
       MONITOR_HOST: 0.0.0.0
       MONITOR_TOKEN: ${MONITOR_TOKEN:?Set MONITOR_TOKEN}
+      RPO_PROBE_ENABLED: ${RPO_PROBE_ENABLED:-false}
       PRIMARY_URL: http://backend-primary:5000
       STANDBY_URL: http://backend-standby:5000
       GATEWAY_URL: http://gateway

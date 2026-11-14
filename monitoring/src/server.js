@@ -4,8 +4,9 @@ import { mkdir, appendFile, readFile, rename, writeFile } from "node:fs/promises
 import { fileURLToPath } from "node:url";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { resolve } from "node:path";
-import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics, sortIncidents, reconcileIncidentHistory } from "./recovery.js";
+import { activeInstance, observeIncidents, recordMilestone, verifyRecoveryPoint, recoveryMetrics, sortIncidents, reconcileIncidentHistory } from "./recovery.js";
 import { probeReplication } from "./replication.js";
+import { createRecoveryProbes } from "./recoveryProbes.js";
 dotenv.config({
   path: fileURLToPath(new URL("../.env", import.meta.url)),
   quiet: true,
@@ -58,12 +59,17 @@ const targets = [
   ["API Gateway", process.env.GATEWAY_URL],
 ];
 const targetFingerprint = createHash("sha256").update(JSON.stringify(targets)).digest("hex");
+const probesEnabled = process.env.RPO_PROBE_ENABLED === "true";
+const probes = createRecoveryProbes({ gateway: process.env.GATEWAY_URL, token: process.env.MONITOR_TOKEN || "" });
+let probeSamples = [];
+const probeStatus = { status: !probesEnabled ? "disabled" : probes.configured ? "waiting" : "not_configured" };
 let lastGatewayPrimaryAt = null;
 try {
   const saved = JSON.parse(await readFile(probeFile, "utf8"));
   if (saved.targetFingerprint === targetFingerprint && Array.isArray(saved.components)) {
     components = saved.components;
     lastGatewayPrimaryAt = saved.lastGatewayPrimaryAt ?? null;
+    if (Array.isArray(saved.probeSamples)) probeSamples = saved.probeSamples;
   }
 } catch (e) { if (e.code !== "ENOENT") persistenceError = true; }
 
@@ -116,14 +122,32 @@ async function check() {
   }
   await exclusive(async () => {
     const updated = observeIncidents(structuredClone(incidents), components, next, observedAt, lastGatewayPrimaryAt);
-    try { await persist(updated); } catch { persistenceError = true; }
     components = next;
     const active = activeInstance(next);
     if (active === "primary") lastGatewayPrimaryAt = next.find(c => c.name === "API Gateway").checked_at;
     if (active === "standby") lastGatewayPrimaryAt = null;
+    if (probesEnabled && probes.configured) {
+      try {
+        if (active === "primary" && next[0].status === "Healthy" && next[0].instance === "primary") {
+          probeSamples = await probes.record(probeSamples);
+          probeStatus.status = "recording";
+        } else if (active === "standby") {
+          const incident = updated[0];
+          if (incident?.api_recovered_instance === "standby" && !incident.tracking_closed_at && !incident.rpo_observation) {
+            incident.rpo_observation = await probes.verify(incident, probeSamples);
+          }
+          probeStatus.status = "standby";
+        } else {
+          probeStatus.status = "waiting";
+        }
+      } catch {
+        probeStatus.status = active === "standby" ? "verification_failed" : "recording_failed";
+      }
+    }
+    try { await persist(updated); } catch { persistenceError = true; }
     try {
       const pendingProbeFile = probeFile + ".tmp";
-      await writeFile(pendingProbeFile, JSON.stringify({ targetFingerprint, components, lastGatewayPrimaryAt }), { mode: 0o600 });
+      await writeFile(pendingProbeFile, JSON.stringify({ targetFingerprint, components, lastGatewayPrimaryAt, probeSamples }), { mode: 0o600 });
       await rename(pendingProbeFile, probeFile);
     } catch { persistenceError = true; }
   });
@@ -179,11 +203,16 @@ const server = http.createServer(async (req, res) => {
       await exclusive(async () => {
         const current = incidents.find((i) => i.id === milestone[1]);
         if (!current) throw new Error("Không tìm thấy sự cố.");
-        const changed = recordMilestone(current, input);
+        const changed = input.stage === "rpo_verified" ? verifyRecoveryPoint(current, input) : recordMilestone(current, input);
         await persist(incidents.map((i) => i.id === changed.id ? changed : i));
       });
       res.end(JSON.stringify({ status: "Saved" }));
-    } catch { res.writeHead(400); res.end(JSON.stringify({ error: "Không lưu được mốc: kiểm tra thời gian, thứ tự các bước, ghi chú và quyền ghi nhật ký." })); }
+    } catch (error) {
+      const isStorageError = typeof error.code === "string";
+      if (isStorageError) persistenceError = true;
+      res.writeHead(isStorageError ? 503 : 400);
+      res.end(JSON.stringify({ message: isStorageError ? "Không ghi được nhật ký Monitoring." : error.message }));
+    }
     return;
   }
   if (req.url !== "/status" || req.method !== "GET") {
@@ -201,6 +230,7 @@ const server = http.createServer(async (req, res) => {
       active_instance: activeInstance(components),
       replication,
       incidents: incidents.map((i) => ({ ...i, metrics: recoveryMetrics(i) })),
+      rpo_probe: { ...probeStatus, last_sample_at: probeSamples.at(-1)?.at || null },
       persistence_error: persistenceError,
       poll_interval_ms: Math.max(5000, Number(process.env.MONITOR_INTERVAL_MS || 10000)),
     }),
