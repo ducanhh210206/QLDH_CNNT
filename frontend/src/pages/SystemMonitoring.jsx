@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Server, Database, Activity, Clock } from "lucide-react";
 import { useData, PageHeading, Panel, Badge, ErrorBox, Refresh } from "../components/common";
 import { api, date } from "../services/api";
@@ -89,6 +89,7 @@ export default function SystemMonitoring() {
   const status = useData("/api/admin/system/status", 10000);
   const runtime = useData("/api/admin/system/metrics", 10000);
   const [selected, setSelected] = useState("");
+  const recoveryMetricsSummary = useRef(null);
   const [historyPage, setHistoryPage] = useState(0);
   const [clock, setClock] = useState(() => ({ now: Date.now(), receivedAt: Date.now() }));
   const data = status.data, monitor = data?.monitoring;
@@ -115,6 +116,11 @@ export default function SystemMonitoring() {
     { name: "API Gateway", status: "Not Configured" },
   ];
   function refresh() { status.reload(); runtime.reload(); }
+  function viewMeasurement(id) {
+    setSelected(id);
+    recoveryMetricsSummary.current?.focus({ preventScroll: true });
+    recoveryMetricsSummary.current?.scrollIntoView({ block: "start" });
+  }
   return <div className="monitoring-page">
     <PageHeading title="Giám sát hệ thống" description="Theo dõi máy chủ, đồng bộ dữ liệu và thời gian khôi phục mỗi 10 giây.">
       <Refresh onClick={refresh} />
@@ -150,7 +156,7 @@ export default function SystemMonitoring() {
         <tbody>{replication.channels.map((c) => <tr key={c.name}><td>{c.name}</td><td>{c.io_running}</td><td>{c.sql_running}</td><td><Badge status={stale ? "Unknown" : c.status} /></td></tr>)}</tbody></table></div>}
     </Panel>
     <Panel title="3. Recovery Metrics" subtitle="Tự ghi số đo khi phát hiện sự cố và kiểm tra API qua Gateway; bộ đếm chạy mỗi giây, trạng thái lấy lại mỗi 10 giây." action={<Activity size={20} />}>
-      <div className="monitor-summary">
+      <div className="monitor-summary" ref={recoveryMetricsSummary} tabIndex={-1} aria-label="Lần đo khôi phục">
         <strong>{selected ? "Đang xem lần đo đã chọn" : "Tự động — lần đo mới nhất"}</strong>
         {incident && <span>{date(incident.timeline.find(e => e.stage === "detected")?.at)} · {incident.id.slice(0, 8)}</span>}
         {selected && <button className="button" onClick={() => setSelected("")}>Theo dõi mới nhất</button>}
@@ -189,7 +195,7 @@ export default function SystemMonitoring() {
               <td>{m.detectionWindow == null ? "—" : "≤ " + duration(m.detectionWindow)}</td>
               <td>{m.gatewaySwitch == null ? "—" : (m.gatewayBound ? "≤ " : "") + duration(m.gatewaySwitch)}</td>
               <td>{m.rpo == null ? "Chưa xác minh" : duration(m.rpo) + (m.rpoObserved ? " (quan sát)" : "")}</td>
-              <td><button className="button" onClick={() => setSelected(i.id)} aria-label={"Xem lần đo " + i.id.slice(0, 8)}>Xem</button></td></tr>;
+              <td><button className="button" onClick={() => viewMeasurement(i.id)} aria-label={"Xem lần đo " + i.id.slice(0, 8)}>Xem</button></td></tr>;
           })}</tbody></table></div>
         <div className="monitor-summary"><button className="button" disabled={page === 0} onClick={() => setHistoryPage(page - 1)}>Trước</button><span>Trang {page + 1} / {Math.ceil(incidents.length / 10)}</span><button className="button" disabled={(page + 1) * 10 >= incidents.length} onClick={() => setHistoryPage(page + 1)}>Sau</button></div>
         {selected && incident && <details className="panel-padding" key={incident.id} open><summary>Chi tiết bản ghi {incident.id.slice(0, 8)}</summary>
