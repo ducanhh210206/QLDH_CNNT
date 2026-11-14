@@ -120,3 +120,12 @@ test('automatic samples and API recovery are persisted independently of business
   assert.equal(incidents[0].timeline.some(e=>e.stage==='recovered'),false);
   assert.equal(recoveryMetrics(incidents[0]).rpo_ms,null);
 });
+
+test('retains the last Gateway Primary sample across an unavailable poll', () => {
+  const sampleAt = '2026-11-09T01:00:00.000Z';
+  const previous = [...healthy, {name:'API Gateway',status:'Offline',checked_at:at}];
+  const next = [...offline, {name:'API Gateway',status:'Healthy',instance:'standby'}];
+  const [incident] = observeIncidents([], previous, next, at, sampleAt);
+  assert.equal(incident.observation.gateway_last_primary_at, sampleAt);
+  assert.equal(incident.api_recovered_instance, 'standby');
+});
