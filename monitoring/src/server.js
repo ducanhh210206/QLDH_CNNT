@@ -1,8 +1,8 @@
 import http from "node:http";
 import dotenv from "dotenv";
-import { mkdir, appendFile, readFile } from "node:fs/promises";
+import { mkdir, appendFile, readFile, rename, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
-import { timingSafeEqual } from "node:crypto";
+import { createHash, timingSafeEqual } from "node:crypto";
 import { resolve } from "node:path";
 import { activeInstance, observeIncidents, recordMilestone, recoveryMetrics, sortIncidents, reconcileIncidentHistory } from "./recovery.js";
 import { probeReplication } from "./replication.js";
@@ -15,6 +15,7 @@ const port = Number(process.env.MONITOR_PORT || 5001),
 const dir = process.env.MONITOR_DATA_DIR ? resolve(process.env.MONITOR_DATA_DIR) : fileURLToPath(new URL("../data/", import.meta.url)),
   logFile = resolve(dir, "incidents.jsonl");
 const recoveryFile = resolve(dir, "recovery.jsonl");
+const probeFile = resolve(dir, "last-probe.json");
 await mkdir(dir, { recursive: true, mode: 0o700 });
 let components = [],
   events = [];
@@ -56,6 +57,16 @@ const targets = [
   ["Backend Standby", process.env.STANDBY_URL],
   ["API Gateway", process.env.GATEWAY_URL],
 ];
+const targetFingerprint = createHash("sha256").update(JSON.stringify(targets)).digest("hex");
+let lastGatewayPrimaryAt = null;
+try {
+  const saved = JSON.parse(await readFile(probeFile, "utf8"));
+  if (saved.targetFingerprint === targetFingerprint && Array.isArray(saved.components)) {
+    components = saved.components;
+    lastGatewayPrimaryAt = saved.lastGatewayPrimaryAt ?? null;
+  }
+} catch (e) { if (e.code !== "ENOENT") persistenceError = true; }
+
 async function check() {
   const next = await Promise.all(
     targets.map(async ([name, url]) => {
@@ -99,13 +110,22 @@ async function check() {
       };
       events.push(event);
       events = events.slice(-100);
-      await appendFile(logFile, JSON.stringify(event) + "\n", { mode: 0o600 });
+      try { await appendFile(logFile, JSON.stringify(event) + "\n", { mode: 0o600 }); }
+      catch { persistenceError = true; }
     }
   }
   await exclusive(async () => {
-    const updated = observeIncidents(structuredClone(incidents), components, next, observedAt);
+    const updated = observeIncidents(structuredClone(incidents), components, next, observedAt, lastGatewayPrimaryAt);
     try { await persist(updated); } catch { persistenceError = true; }
     components = next;
+    const active = activeInstance(next);
+    if (active === "primary") lastGatewayPrimaryAt = next.find(c => c.name === "API Gateway").checked_at;
+    if (active === "standby") lastGatewayPrimaryAt = null;
+    try {
+      const pendingProbeFile = probeFile + ".tmp";
+      await writeFile(pendingProbeFile, JSON.stringify({ targetFingerprint, components, lastGatewayPrimaryAt }), { mode: 0o600 });
+      await rename(pendingProbeFile, probeFile);
+    } catch { persistenceError = true; }
   });
   replication = await probeReplication();
   lastCheckAt = new Date().toISOString();

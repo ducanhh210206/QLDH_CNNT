@@ -45,7 +45,9 @@ test('independent monitor persists outage milestones across restart and protects
     await launch();
     assert.equal((await fetch(monitorBase+'/status')).status,401);
     assert.equal((await status()).active_instance,'primary');
+    await stop();
     primary=false; standby=true;
+    await launch();
     let body;
     for(let n=0;n<65;n++){body=await status();if(body.incidents.length)break;await delay(100);}
     assert.equal(body.incidents.length,1);
@@ -55,6 +57,7 @@ test('independent monitor persists outage milestones across restart and protects
     assert.equal(incident.api_recovered_instance,'standby');
     assert.equal(incident.api_recovered_at,incident.timeline.find(e=>e.stage==='standby_active').at);
     assert.ok(incident.observation.primary_last_healthy_at);
+    assert.ok(incident.observation.gateway_last_primary_at);
     const endpoint=monitorBase+'/incidents/'+incident.id+'/milestones';
     const at = new Date(Date.parse(incident.timeline[0].at)-1000).toISOString();
     const input={stage:'fault_started',at,note:'isolated fixture log'};

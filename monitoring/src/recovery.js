@@ -34,12 +34,16 @@ export function activeInstance(components) {
   const gateway = components.find((c) => c.name === "API Gateway");
   return gateway?.status === "Healthy" ? gateway.instance || null : null;
 }
-export function observeIncidents(incidents, previous, next, at) {
+export function observeIncidents(incidents, previous, next, at, lastGatewayPrimaryAt = null) {
   const primary = next.find((c) => c.name === "Backend Primary");
   const old = previous.find((c) => c.name === "Backend Primary");
   let current = incidents.find((i) => !i.tracking_closed_at && !i.timeline.some((e) => e.stage === "recovered"));
   const outage = old?.status === "Healthy" && ["Offline", "Unhealthy"].includes(primary?.status);
-  const switched = activeInstance(previous) === "primary" && activeInstance(next) === "standby";
+  const gatewayWasPrimary = activeInstance(previous) === "primary";
+  const gatewayPrimarySample = gatewayWasPrimary
+    ? previous.find(c => c.name === "API Gateway")?.checked_at || lastGatewayPrimaryAt
+    : lastGatewayPrimaryAt;
+  const switched = (gatewayWasPrimary || gatewayPrimarySample) && activeInstance(next) === "standby";
   if (outage || switched && (!current || primary?.status === "Healthy" || current.timeline.some((e) => e.stage === "standby_active"))) {
     if (current) {
       current.tracking_closed_at = at;
@@ -49,8 +53,7 @@ export function observeIncidents(incidents, previous, next, at) {
       trigger: outage ? "primary_outage" : "gateway_switch",
       observation: {
         primary_last_healthy_at: outage ? old?.checked_at || null : null,
-        gateway_last_primary_at: activeInstance(previous) === "primary"
-          ? previous.find(c => c.name === "API Gateway")?.checked_at || null : null,
+        gateway_last_primary_at: gatewayPrimarySample,
       },
       timeline: [{ stage: "detected", at, source: outage ? "probe" : "gateway",
         note: outage ? "Lần kiểm tra đầu tiên ghi nhận Primary không sẵn sàng."
