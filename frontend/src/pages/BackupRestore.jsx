@@ -23,6 +23,9 @@ export default function BackupRestore({ notify }) {
     [err, setErr] = useState(""),
     [selected, setSelected] = useState(null),
     [confirmed, setConfirmed] = useState(false),
+    [applyCurrent, setApplyCurrent] = useState(false),
+    [confirmationCode, setConfirmationCode] = useState(''),
+    [uncertainApply, setUncertainApply] = useState(false),
     [result, setResult] = useState(null);
   async function backup() {
     setBusy(true);
@@ -38,25 +41,30 @@ export default function BackupRestore({ notify }) {
     }
   }
   async function restore() {
+    if (busy || uncertainApply) return;
     setBusy(true);
     setErr("");
     try {
-      const r = await api("/api/admin/restores", {
+      const r = await api(applyCurrent ? "/api/admin/restores/apply" : "/api/admin/restores", {
         method: "POST",
         body: JSON.stringify({
           backup_id: selected.id,
-          confirmation: "RESTORE_TO_ISOLATED_DATABASE",
+          confirmation: applyCurrent ? 'RESTORE_CURRENT_DATABASE:' + selected.id : "RESTORE_TO_ISOLATED_DATABASE",
         }),
       });
       setResult(r);
       setSelected(null);
       notify(
-        r.status === "Verified"
+        r.status === 'Applied' ? 'Đã đưa dữ liệu đang sử dụng về bản backup. Tải lại trang; bạn có thể cần đăng nhập lại.' : r.status === "Verified"
           ? "Đã phục hồi và đối chiếu thành công."
           : "Phục hồi có dữ liệu cần kiểm tra.",
       );
+      reload();
     } catch (e) {
-      setErr(e.message);
+      if (applyCurrent && e.uncertain) {
+        setUncertainApply(true);
+        setErr('Chưa xác định tác vụ phục hồi đã hoàn tất chưa. Không bấm lại; kiểm tra dữ liệu và nhật ký restore_records trước.');
+      } else setErr(e.message);
     } finally {
       setBusy(false);
     }
@@ -126,15 +134,23 @@ export default function BackupRestore({ notify }) {
                     <td>
                       <button
                         className="button secondary"
-                        disabled={busy || b.status !== "Success"}
+                        disabled={busy || b.status !== "Success" || b.file_available === false}
                         onClick={() => {
                           setSelected(b);
                           setConfirmed(false);
+                          setApplyCurrent(false);
+                          setConfirmationCode('');
+                          setUncertainApply(false);
                         }}
                       >
                         <RotateCcw size={15} />
                         Phục hồi thử
                       </button>
+                      <button className="button secondary" disabled={busy || b.status !== 'Success' || b.file_available === false}
+                        onClick={() => {setSelected(b);setConfirmed(false);setApplyCurrent(true);setConfirmationCode('');setUncertainApply(false);}}>
+                        Khôi phục dữ liệu đang dùng
+                      </button>
+                      {b.file_available === false && <small>Backend hiện tại không có file backup này.</small>}
                     </td>
                   </tr>
                 ))}
@@ -148,9 +164,10 @@ export default function BackupRestore({ notify }) {
           <div className="panel-padding">
             <Badge status={result.status} />
             <p>
-              Trước: {result.report.orders_before} đơn · Sau:{" "}
+              Trước: {result.report.current_orders_before ?? result.report.orders_before} đơn · Sau:{" "}
               {result.report.orders_after} đơn
             </p>
+            {result.status === 'Applied' && <p>Đơn phát sinh sau backup bị loại bỏ: {result.report.removed_later_orders}. Đối chiếu với backup:</p>}
             <p>
               Thiếu: {result.report.missing_orders.length} · Thay đổi:{" "}
               {result.report.changed_orders.length} · Phát sinh:{" "}
@@ -161,23 +178,24 @@ export default function BackupRestore({ notify }) {
               · Thời gian chạy restore: {result.report.restore_duration_ms} ms
             </p>
             <p className="muted">
-              RTO/RPO: chưa đo. Database đang sử dụng không được chuyển đổi tự
-              động.
+              {result.status === 'Applied' ? 'Dữ liệu đang sử dụng đã quay về bản backup. Tải lại danh sách đơn hàng để kiểm tra.' : 'RTO/RPO: chưa đo. Đây là kết quả phục hồi cách ly.'}
             </p>
+            {result.report.rollback_backup_id && <p>Bản sao trước phục hồi để quay lui: {result.report.rollback_backup_id}</p>}
+            {result.status === 'Applied' && <button className="button primary" onClick={() => window.location.reload()}>Tải lại hệ thống</button>}
+            {result.audit_saved === false && <p>Đã phục hồi dữ liệu nhưng chưa lưu được nhật ký kết quả. Ghi lại bản sao quay lui ở trên.</p>}
           </div>
         </Panel>
       )}
       {selected && (
         <Modal
-          title="Xác nhận phục hồi cách ly"
+          title={applyCurrent ? 'Khôi phục dữ liệu đang sử dụng' : "Xác nhận phục hồi cách ly"}
           onClose={() => {
             if (!busy) setSelected(null);
           }}
         >
           <div className="notice">
             <AlertTriangle size={19} />
-            Hệ thống tạo database mới omdrs_restore_… để kiểm chứng. Cần tài
-            khoản MySQL có quyền CREATE DATABASE.
+            {applyCurrent ? 'Đơn hàng, sản phẩm, tồn kho, tài khoản và dữ liệu nghiệp vụ sẽ trở về thời điểm backup. Đơn tạo sau đó sẽ bị loại bỏ. Hệ thống tạo bản sao quay lui, kiểm chứng rồi thay dữ liệu trong một giao dịch.' : 'Hệ thống tạo database mới omdrs_restore_… để kiểm chứng. Cần tài khoản MySQL có quyền CREATE DATABASE.'}
           </div>
           <p className="panel-padding">
             Bản sao: {selected.id}
@@ -190,15 +208,19 @@ export default function BackupRestore({ notify }) {
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
             />
-            Tôi xác nhận phục hồi vào database cách ly mới và đối chiếu dữ liệu.
+            {applyCurrent ? 'Tôi xác nhận đã tạm dừng thao tác trên cả hai backend và chấp nhận loại bỏ dữ liệu phát sinh sau backup.' : 'Tôi xác nhận phục hồi vào database cách ly mới và đối chiếu dữ liệu.'}
           </label>
+          {applyCurrent && <div className="panel-padding">
+            <p>Lịch sử backup/restore, phiên bản cấu trúc và mẫu Monitoring được giữ lại. Chỉ các backend cùng database này nhận thay đổi; MySQL replica riêng cần được kiểm tra đồng bộ.</p>
+            <label>Nhập mã {selected.id.slice(0,8)} để xác nhận<input value={confirmationCode} onChange={e => setConfirmationCode(e.target.value)} autoComplete="off" /></label>
+          </div>}
           <div className="form-footer">
             <button
               className="button primary"
-              disabled={!confirmed || busy}
+              disabled={!confirmed || busy || uncertainApply || (applyCurrent && confirmationCode !== selected.id.slice(0,8))}
               onClick={restore}
             >
-              {busy ? "Đang phục hồi…" : "Phục hồi & kiểm chứng"}
+              {busy ? "Đang phục hồi…" : applyCurrent ? 'Khôi phục dữ liệu đang dùng' : "Phục hồi & kiểm chứng"}
             </button>
           </div>
           <ErrorBox error={err} />

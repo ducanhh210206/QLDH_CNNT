@@ -86,6 +86,7 @@ test("registration stores Pending Staff and does not create a session", async (t
   t.after(() => (env.jwt = previous));
   const calls = [];
   t.mock.method(pool, "execute", async (sql, args) => {
+    if (sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
     calls.push({ sql, args });
     return [{ affectedRows: 1 }];
   });
@@ -110,6 +111,7 @@ test("pending account with correct password cannot sign in", async (t) => {
   const hashed = await hashPassword("correct-password-123");
   let writes = 0;
   t.mock.method(pool, "execute", async (sql) => {
+    if (sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
     if (sql.startsWith("SELECT * FROM users"))
       return [[{ ...staff, account_status: "Pending", password_hash: hashed }]];
     writes++;
@@ -133,6 +135,7 @@ test("Staff without assigned permissions is denied API operations, not just hidd
     ["get", "/api/admin/users"],
     ["post", "/api/admin/users"],
     ["post", "/api/admin/backups"],
+    ["post", "/api/admin/restores/apply"],
   ]) {
     const r = await request(app)
       [method](path)
@@ -319,6 +322,7 @@ test("revoked manager cannot issue a new staff account after authorization races
     },
     release: () => {},
     execute: async (sql) => {
+    if (sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
       if (sql.startsWith("INSERT")) inserts++;
       return sql.includes("schema_migrations")
         ? [[{ version: "002_user_access" }]]

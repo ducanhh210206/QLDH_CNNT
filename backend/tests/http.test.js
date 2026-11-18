@@ -45,6 +45,7 @@ test("RPO probes require the monitor token and write only on Primary", async (t)
   env.instance = "standby";
   assert.equal((await request(app).post(path).set("Authorization", bearer).send({ id })).status, 409);
   t.mock.method(pool, "execute", async (_sql, values) => {
+    if (_sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
     assert.deepEqual(values, [id]);
     return [[{ id }]];
   });
@@ -154,6 +155,7 @@ test("authenticated order query fails with structured 503 instead of fake data",
     env.jwt = old;
   });
   t.mock.method(pool, "execute", async (sql) => {
+    if (sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
     if (sql.includes("auth_sessions"))
       return [
         [
