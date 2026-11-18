@@ -176,7 +176,7 @@ export async function restoreBackup(backupId, userId, confirmation) {
     await c.changeUser({ database: target });
     await c.query("SET time_zone='+00:00'");
     await c.query(
-      "SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION'",
+      "SET SESSION sql_mode='STRICT_TRANS_TABLES,NO_ENGINE_SUBSTITUTION,ANSI_QUOTES'",
     );
     await c.query(sql);
     const [after] = await c.query("SELECT * FROM orders");
