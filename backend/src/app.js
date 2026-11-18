@@ -78,11 +78,10 @@ app.use(
     legacyHeaders: false,
   }),
 );
-app.use('/api', restoreGuard);
 app.use("/api/auth", authRoutes);
 app.use("/api/monitoring/recovery-probes", recoveryProbeRoutes);
-app.use("/api/notifications", requireAuth, notificationRoutes);
-app.use("/api/orders", requireAuth, orderRoutes);
+app.use("/api/notifications", requireAuth, restoreGuard, notificationRoutes);
+app.use("/api/orders", requireAuth, restoreGuard, orderRoutes);
 app.get(
   "/api/dashboard/summary",
   requireAuth,
@@ -95,15 +94,15 @@ app.get(
   permission("statistics.read"),
   order.statistics,
 );
-app.use("/api/products", requireAuth, productRoutes);
+app.use("/api/products", requireAuth, restoreGuard, productRoutes);
 app.get(
   "/api/transactions",
   requireAuth,
   permission("transactions.read"),
   async (req, res) => res.json(await transactions(listParams(req.query))),
 );
-app.use("/api/admin/users", requireAuth, admin, userRoutes);
-app.use("/api/admin", requireAuth, admin, adminRoutes);
+app.use("/api/admin/users", requireAuth, admin, restoreGuard, userRoutes);
+app.use("/api/admin", requireAuth, admin, restoreGuard, adminRoutes);
 if (env.serveFrontend) mountFrontend(app, env.frontendDir);
 app.use((req, res) =>
   res
