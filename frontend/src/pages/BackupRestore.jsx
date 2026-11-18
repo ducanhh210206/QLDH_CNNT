@@ -4,7 +4,6 @@ import {
   RotateCcw,
   ShieldCheck,
   AlertTriangle,
-  CheckCircle2,
 } from "lucide-react";
 import { api, date } from "../services/api";
 import {
@@ -23,7 +22,6 @@ export default function BackupRestore({ notify }) {
     [err, setErr] = useState(""),
     [selected, setSelected] = useState(null),
     [confirmed, setConfirmed] = useState(false),
-    [applyCurrent, setApplyCurrent] = useState(false),
     [confirmationCode, setConfirmationCode] = useState(''),
     [uncertainApply, setUncertainApply] = useState(false),
     [result, setResult] = useState(null);
@@ -45,11 +43,11 @@ export default function BackupRestore({ notify }) {
     setBusy(true);
     setErr("");
     try {
-      const r = await api(applyCurrent ? "/api/admin/restores/apply" : "/api/admin/restores", {
+      const r = await api("/api/admin/restores/apply", {
         method: "POST",
         body: JSON.stringify({
           backup_id: selected.id,
-          confirmation: applyCurrent ? 'RESTORE_CURRENT_DATABASE:' + selected.id : "RESTORE_TO_ISOLATED_DATABASE",
+          confirmation: 'RESTORE_CURRENT_DATABASE:' + selected.id,
         }),
       });
       setResult(r);
@@ -61,7 +59,7 @@ export default function BackupRestore({ notify }) {
       );
       reload();
     } catch (e) {
-      if (applyCurrent && e.uncertain) {
+      if (e.uncertain) {
         setUncertainApply(true);
         setErr('Chưa xác định tác vụ phục hồi đã hoàn tất chưa. Không bấm lại; kiểm tra dữ liệu và nhật ký restore_records trước.');
       } else setErr(e.message);
@@ -86,8 +84,7 @@ export default function BackupRestore({ notify }) {
         <div>
           <h3>Phục hồi có kiểm chứng</h3>
           <p>
-            Backup SQL nhất quán · SHA-256 · Database phục hồi cách ly · Đối
-            chiếu từng bản ghi
+            Backup SQL nhất quán · SHA-256 · Kiểm chứng trước khi khôi phục dữ liệu đang dùng
           </p>
         </div>
         <span className="outline-tag">ADMIN ONLY</span>
@@ -132,23 +129,9 @@ export default function BackupRestore({ notify }) {
                       <Badge status={b.status} />
                     </td>
                     <td>
-                      <button
-                        className="button secondary"
-                        disabled={busy || b.status !== "Success" || b.file_available === false}
-                        onClick={() => {
-                          setSelected(b);
-                          setConfirmed(false);
-                          setApplyCurrent(false);
-                          setConfirmationCode('');
-                          setUncertainApply(false);
-                        }}
-                      >
-                        <RotateCcw size={15} />
-                        Phục hồi thử
-                      </button>
                       <button className="button secondary" disabled={busy || b.status !== 'Success' || b.file_available === false}
-                        onClick={() => {setSelected(b);setConfirmed(false);setApplyCurrent(true);setConfirmationCode('');setUncertainApply(false);}}>
-                        Khôi phục dữ liệu đang dùng
+                        onClick={() => {setSelected(b);setConfirmed(false);setConfirmationCode('');setUncertainApply(false);}}>
+                        <RotateCcw size={15} /> Khôi phục dữ liệu đang dùng
                       </button>
                       {b.file_available === false && <small>Backend hiện tại không có file backup này.</small>}
                     </td>
@@ -188,14 +171,14 @@ export default function BackupRestore({ notify }) {
       )}
       {selected && (
         <Modal
-          title={applyCurrent ? 'Khôi phục dữ liệu đang sử dụng' : "Xác nhận phục hồi cách ly"}
+          title="Khôi phục dữ liệu đang sử dụng"
           onClose={() => {
             if (!busy) setSelected(null);
           }}
         >
           <div className="notice">
             <AlertTriangle size={19} />
-            {applyCurrent ? 'Đơn hàng, sản phẩm, tồn kho, tài khoản và dữ liệu nghiệp vụ sẽ trở về thời điểm backup. Đơn tạo sau đó sẽ bị loại bỏ. Hệ thống tạo bản sao quay lui, kiểm chứng rồi thay dữ liệu trong một giao dịch.' : 'Hệ thống tạo database mới omdrs_restore_… để kiểm chứng. Cần tài khoản MySQL có quyền CREATE DATABASE.'}
+            Đơn hàng, sản phẩm, tồn kho, tài khoản và dữ liệu nghiệp vụ sẽ trở về thời điểm backup. Đơn tạo sau đó sẽ bị loại bỏ. Hệ thống tạo bản sao quay lui, kiểm chứng rồi thay dữ liệu trong một giao dịch.
           </div>
           <p className="panel-padding">
             Bản sao: {selected.id}
@@ -208,19 +191,19 @@ export default function BackupRestore({ notify }) {
               checked={confirmed}
               onChange={(e) => setConfirmed(e.target.checked)}
             />
-            {applyCurrent ? 'Tôi xác nhận đã tạm dừng thao tác trên cả hai backend và chấp nhận loại bỏ dữ liệu phát sinh sau backup.' : 'Tôi xác nhận phục hồi vào database cách ly mới và đối chiếu dữ liệu.'}
+            Tôi xác nhận đã tạm dừng thao tác trên cả hai backend và chấp nhận loại bỏ dữ liệu phát sinh sau backup.
           </label>
-          {applyCurrent && <div className="panel-padding">
+          <div className="panel-padding">
             <p>Lịch sử backup/restore, phiên bản cấu trúc và mẫu Monitoring được giữ lại. Chỉ các backend cùng database này nhận thay đổi; MySQL replica riêng cần được kiểm tra đồng bộ.</p>
             <label>Nhập mã {selected.id.slice(0,8)} để xác nhận<input value={confirmationCode} onChange={e => setConfirmationCode(e.target.value)} autoComplete="off" /></label>
-          </div>}
+          </div>
           <div className="form-footer">
             <button
               className="button primary"
-              disabled={!confirmed || busy || uncertainApply || (applyCurrent && confirmationCode !== selected.id.slice(0,8))}
+              disabled={!confirmed || busy || uncertainApply || confirmationCode !== selected.id.slice(0,8)}
               onClick={restore}
             >
-              {busy ? "Đang phục hồi…" : applyCurrent ? 'Khôi phục dữ liệu đang dùng' : "Phục hồi & kiểm chứng"}
+              {busy ? 'Đang phục hồi…' : 'Khôi phục dữ liệu đang dùng'}
             </button>
           </div>
           <ErrorBox error={err} />
