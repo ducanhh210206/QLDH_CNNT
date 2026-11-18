@@ -1,6 +1,6 @@
 # Khôi phục dữ liệu đang sử dụng về backup
 
-Admin mở Sao lưu & phục hồi, chọn backup Success có file trên backend hiện tại, bấm **Khôi phục dữ liệu đang dùng**, tích xác nhận tạm dừng thao tác và gõ 8 ký tự đầu mã backup. Phục hồi thử cách ly vẫn là một nút riêng.
+Admin mở Sao lưu & phục hồi, chọn backup Success có file trên backend hiện tại, bấm **Khôi phục dữ liệu đang dùng**, tích xác nhận tạm dừng thao tác và gõ 8 ký tự đầu mã backup. Kiểm chứng bằng database cách ly chạy tự động bên trong, không còn nút Phục hồi thử riêng trên giao diện.
 
 Ví dụ: backup có 26 đơn/tồn kho 9; sau đó tạo đơn thứ 27/tồn kho 8; áp dụng bản backup đưa dữ liệu nghiệp vụ về 26 đơn/tồn kho 9. Đơn sau backup không còn trong dữ liệu đang phục vụ. Đây là thao tác thực tế trên database backend được cấu hình, không phải mô phỏng giao diện.
 
