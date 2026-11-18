@@ -21,3 +21,7 @@ export const restore = async (req, res) => {
 };
 export const getRestore = async (req, res) =>
   res.json(await svc.getRestore(validId(req.params.id)));
+export const apply = async (req, res) => {
+  const b = parse(z.object({backup_id:z.uuid(),confirmation:z.string()}).strict(),req.body);
+  res.status(201).json(await svc.restoreCurrentDatabase(b.backup_id, req.user.id, b.confirmation));
+};

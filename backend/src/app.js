@@ -23,6 +23,7 @@ import { listParams } from "./middlewares/validateOrder.js";
 import { mountFrontend } from "./utils/serveFrontend.js";
 import { notificationRoutes } from "./routes/notificationRoutes.js";
 import { recoveryProbeRoutes } from "./routes/recoveryProbeRoutes.js";
+import { restoreGuard } from "./middlewares/restoreGuard.js";
 export const app = express();
 app.disable("x-powered-by");
 if (env.trustProxy) app.set("trust proxy", env.trustProxy);
@@ -77,6 +78,7 @@ app.use(
     legacyHeaders: false,
   }),
 );
+app.use('/api', restoreGuard);
 app.use("/api/auth", authRoutes);
 app.use("/api/monitoring/recovery-probes", recoveryProbeRoutes);
 app.use("/api/notifications", requireAuth, notificationRoutes);

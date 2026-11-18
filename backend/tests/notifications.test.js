@@ -21,6 +21,7 @@ function setup(t, user = staff) {
   t.after(() => (env.jwt = previous));
   const queries = [];
   t.mock.method(pool, "execute", async (sql, args) => {
+    if (sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
     queries.push({ sql, args });
     if (sql.includes("auth_sessions")) return [[user]];
     assert.ok(sql.includes("user_access_history"));
@@ -39,6 +40,7 @@ function setup(t, user = staff) {
     ];
   });
   t.mock.method(pool, "query", async (sql, args) => {
+    if (sql.includes("IS_USED_LOCK")) return [[{restore_owner:null}]];
     queries.push({ sql, args });
     if (sql.startsWith("INSERT IGNORE")) return [{ affectedRows: 1 }];
     if (sql.includes("notification_reads")) {

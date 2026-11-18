@@ -7,6 +7,7 @@ import { pool } from "../config/database.js";
 import { env, directDatabaseConfig, databaseLockName } from "../config/env.js";
 import { digest, compareOrders } from "../utils/integrity.js";
 import { fail } from "../utils/errors.js";
+import { applyVerifiedRestore } from "./applyRestore.js";
 // Only application tables; auth sessions and idempotency keys stay part of consistent snapshot.
 const tables = [
   "users",
@@ -29,7 +30,10 @@ export async function listBackups() {
   const [r] = await pool.query(
     "SELECT * FROM backup_records ORDER BY created_at DESC LIMIT 100",
   );
-  return r;
+  return Promise.all(r.map(async record => {
+    try { await stat(join(env.backups, record.id + '.sql')); await stat(join(env.backups, record.id + '.json')); return {...record, file_available: true}; }
+    catch { return {...record, file_available: false}; }
+  }));
 }
 export async function createBackup(userId = null) {
   if (busy) fail(409, "BACKUP_BUSY", "Một bản sao lưu đang được tạo.");
@@ -148,10 +152,14 @@ export async function restoreBackup(backupId, userId, confirmation) {
   );
   if (!records[0])
     fail(404, "NOT_FOUND", "Không có backup thành công tương ứng.");
-  const sql = await readFile(join(env.backups, backupId + ".sql"), "utf8"),
-    manifest = JSON.parse(
-      await readFile(join(env.backups, backupId + ".json"), "utf8"),
-    );
+  let sql, manifest;
+  try {
+    sql = await readFile(join(env.backups, backupId + ".sql"), "utf8");
+    manifest = JSON.parse(await readFile(join(env.backups, backupId + ".json"), "utf8"));
+  } catch (e) {
+    if (e.code === 'ENOENT') fail(409, 'BACKUP_FILE_UNAVAILABLE', 'Backend đang phục vụ không có file backup này. Tạo backup trên backend hiện tại hoặc chuyển file qua kho backup dùng chung.');
+    throw e;
+  }
   if (
     digest(sql) !== records[0].sha256 ||
     digest(sql) !== manifest.sha256 ||
@@ -220,6 +228,46 @@ export async function restoreBackup(backupId, userId, confirmation) {
     throw e;
   } finally {
     await c?.end();
+  }
+}
+export async function restoreCurrentDatabase(backupId, userId, confirmation) {
+  if (confirmation !== 'RESTORE_CURRENT_DATABASE:' + backupId)
+    fail(400, 'CONFIRMATION_REQUIRED', 'Cần xác nhận mã backup để thay dữ liệu đang sử dụng.');
+  // These operations verify the backup and produce a durable, independently
+  // restorable rollback snapshot before any live row is changed.
+  const verified = await restoreBackup(backupId, userId, 'RESTORE_TO_ISOLATED_DATABASE');
+  if (verified.status !== 'Verified') fail(409, 'RESTORE_NOT_VERIFIED', 'Backup chưa vượt qua kiểm chứng.');
+  const safety = await createBackup(userId);
+  const manifest = JSON.parse(await readFile(join(env.backups, backupId + '.json'), 'utf8'));
+  const safetyManifest = JSON.parse(await readFile(join(env.backups, safety.id + '.json'), 'utf8'));
+  if (busy) fail(409, 'BACKUP_BUSY', 'Đang có tác vụ backup khác.');
+  busy = true;
+  let c, locked = false, maintenanceLocked = false;
+  try {
+    c = await mysql.createConnection(directDatabaseConfig());
+    await c.query("SET time_zone='+00:00'");
+    const [[lock]] = await c.execute('SELECT GET_LOCK(?,0) AS acquired', [databaseLockName()]);
+    if (Number(lock.acquired) !== 1) fail(409, 'BACKUP_BUSY', 'Backend khác đang backup hoặc phục hồi.');
+    locked = true;
+    const [[maintenance]] = await c.execute('SELECT GET_LOCK(?,0) AS acquired', [databaseLockName() + ':restore']);
+    if (Number(maintenance.acquired) !== 1) fail(409, 'BACKUP_BUSY', 'Đang có tác vụ phục hồi khác.');
+    maintenanceLocked = true;
+    const applied = await applyVerifiedRestore(c, env.db.database, verified.target_database, manifest, safetyManifest, userId);
+    const beforeToBackup = compareOrders(safetyManifest.orders, manifest.orders);
+    const report = {...verified.report, ...applied, applied_to_current: true,
+      current_orders_before: safetyManifest.tables.orders.count,
+      removed_later_orders: beforeToBackup.missing_orders.length,
+      rollback_backup_id: safety.id, applied_at: new Date().toISOString()};
+    // Commit is the success boundary. A later audit failure must not report that
+    // the data restore failed, encouraging a repeat of a destructive operation.
+    let auditSaved = true;
+    try { await pool.execute('UPDATE restore_records SET status=?,report=? WHERE id=?', ['Applied', JSON.stringify(report), verified.id]); }
+    catch { auditSaved = false; }
+    return {...verified, status: 'Applied', report, audit_saved: auditSaved};
+  } finally {
+    if (maintenanceLocked) await c.execute('SELECT RELEASE_LOCK(?)', [databaseLockName() + ':restore']).catch(() => {});
+    if (locked) await c.execute('SELECT RELEASE_LOCK(?)', [databaseLockName()]).catch(() => {});
+    await c?.end(); busy = false;
   }
 }
 export async function getRestore(id) {

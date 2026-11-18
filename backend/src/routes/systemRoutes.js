@@ -19,4 +19,5 @@ const limited = rateLimit({
 });
 adminRoutes.post("/backups", limited, b.create);
 adminRoutes.post("/restores", limited, b.restore);
+adminRoutes.post("/restores/apply", limited, b.apply);
 adminRoutes.get("/restores/:id", b.getRestore);
