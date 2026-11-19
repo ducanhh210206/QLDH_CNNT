@@ -1,0 +1,26 @@
+# Standby chuan bi lai sau khi Aiven da xoa binlog cu.
+# Khong publish cong tren Windows; giu nguyen container va volume Standby cu.
+name: omdrs-standby-chuan-bi
+services:
+  mysql-standby:
+    image: mysql:8.4.13
+    environment:
+      MYSQL_ROOT_PASSWORD: ${STANDBY_ROOT_PASSWORD:?Set a dedicated standby root password}
+    command:
+      - --server-id=493203311
+      - --log-bin=mysql-bin
+      - --relay-log=standby-relay-bin
+      - --relay-log-index=standby-relay-bin.index
+      - --gtid-mode=ON
+      - --enforce-gtid-consistency=ON
+      - --log-replica-updates=ON
+      - --skip-replica-start=ON
+      - --event-scheduler=OFF
+      - '--replicate-wild-do-table=order\_management.%'
+    volumes:
+      - standby_data:/var/lib/mysql
+      - ./mysql/init-standby-guard.sql:/docker-entrypoint-initdb.d/01-standby-guard.sql:ro
+      - ../database/backups/aiven-ca.pem:/etc/mysql/aiven-ca.pem:ro
+volumes:
+  standby_data:
+    name: omdrs-standby-chuan-bi-20261111-data

@@ -19,6 +19,7 @@ from pathlib import Path
 CONTAINER = 'omdrs-standby-3308-chuan-bi-mysql-standby-1'
 TARGET_UUID = '499d310a-d869-11f1-aa19-d27522af636a'
 TARGET_SERVER_ID = '493203308'
+EXPECTED_TABLE_COUNT = '13'
 HOST = 'mysql-7b63f20-qldh-demo.b.aivencloud.com'
 PORT = '14586'
 REPL_USER = 'replica_phuc'
@@ -109,7 +110,7 @@ def main() -> None:
         "GTID_SUBSET('" + SNAPSHOT + "', @@GLOBAL.gtid_executed), @@GLOBAL.gtid_executed"
     )
     fields = mysql(target_query, local_password).split('\t')
-    if len(fields) != 8 or fields[:7] != [TARGET_UUID, TARGET_SERVER_ID, '1', '1', '1', '13', '1']:
+    if len(fields) != 8 or fields[:7] != [TARGET_UUID, TARGET_SERVER_ID, '1', '1', '1', EXPECTED_TABLE_COUNT, '1']:
         raise RuntimeError('Standby, che do chi doc, so bang hoac moc GTID khong dung. Chua khoi dong.')
     target_gtid = ''.join(fields[7].split())
     if not re.fullmatch(r'[A-Za-z0-9_:\-,]+', target_gtid):

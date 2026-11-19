@@ -6,6 +6,7 @@ import sys
 
 CONTAINER = 'omdrs-standby-sau-failback-mysql-standby-1'
 UUID = '13bc73d1-db6d-11f1-8c8e-22c586f6983b'
+SERVER_ID = '493203310'
 COMMAND = [
     'docker', 'exec', '-i', CONTAINER, 'sh', '-c',
     'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql --no-defaults -u root --batch --skip-column-names',
@@ -24,7 +25,7 @@ def query(sql):
 def main():
     actual = query("SELECT @@server_uuid,@@server_id,@@GLOBAL.read_only,@@GLOBAL.super_read_only,"
                    "(SELECT COUNT(*) FROM mysql.user WHERE user='order_user' AND host='%')")
-    if actual.split('\t') != [UUID, '493203310', '1', '1', '0']:
+    if actual.split('\t') != [UUID, SERVER_ID, '1', '1', '0']:
         raise RuntimeError('UUID, che do chi doc hoac tai khoan khong dung nhu du kien; chua thay doi.')
 
     secret = getpass.getpass('Dat mat khau MySQL moi cho order_user: ')

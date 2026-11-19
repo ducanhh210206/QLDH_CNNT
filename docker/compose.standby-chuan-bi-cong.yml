@@ -1,0 +1,5 @@
+# Gan cong 3308 cho standby moi; dung cung compose.standby-chuan-bi.yml.
+services:
+  mysql-standby:
+    ports:
+      - '127.0.0.1:3308:3306'
