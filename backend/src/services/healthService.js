@@ -1,4 +1,5 @@
 import { pool } from "../config/database.js";
+import { loadMonitoringWithHistory } from "./monitoringHistory.js";
 import { env } from "../config/env.js";
 export async function readiness() {
   const start = performance.now();
@@ -32,27 +33,25 @@ export async function readiness() {
     };
   }
 }
-export async function systemStatus() {
-  let monitoring;
-  try {
+let monitoringRequest;
+export async function refreshMonitoringHistory() {
+  if (monitoringRequest) return monitoringRequest;
+  monitoringRequest = loadMonitoringWithHistory(async () => {
     const r = await fetch(env.monitor + "/status", {
       headers: { Authorization: "Bearer " + env.monitorToken },
       signal: AbortSignal.timeout(4000),
     });
-    if (!r.ok) throw Error();
-    monitoring = await r.json();
-  } catch {
-    monitoring = {
-      status: "Unknown",
-      components: [],
-      events: [],
-      message: "Không kết nối được dịch vụ giám sát độc lập.",
-    };
-  }
+    if (!r.ok) throw Error('MONITOR_UNAVAILABLE');
+    return r.json();
+  });
+  try { return await monitoringRequest; } finally { monitoringRequest = null; }
+}
+export async function systemStatus() {
+  const monitoring = await refreshMonitoringHistory();
   return {
     backend: await readiness(),
     monitoring,
-    standby_database: monitoring.replication?.status || "Unknown",
+    standby_database: monitoring.history_only ? "Unknown" : monitoring.replication?.status || "Unknown",
     ha_verified: false,
   };
 }
