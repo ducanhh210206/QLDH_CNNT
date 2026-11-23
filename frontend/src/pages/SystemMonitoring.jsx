@@ -103,7 +103,7 @@ export default function SystemMonitoring() {
   const incident = incidents.find((i) => i.id === selected) || incidents[0];
   const replication = monitor?.replication;
   const checked = Date.parse(monitor?.checked_at);
-  const stale = !!status.error || !Number.isFinite(checked) || Date.now() - checked > Math.max(30000, (monitor?.poll_interval_ms || 10000) * 2 + 10000);
+  const stale = !!monitor?.history_only || !!status.error || !Number.isFinite(checked) || Date.now() - checked > Math.max(30000, (monitor?.poll_interval_ms || 10000) * 2 + 10000);
   const serverNow = Date.parse(monitor?.server_time || monitor?.checked_at) + Math.max(0, clock.now - clock.receivedAt);
   const measurement = automaticRecoveryMetrics(incident, serverNow, stale);
   const page = Math.min(historyPage, Math.max(0, Math.ceil(incidents.length / 10) - 1));
@@ -135,11 +135,13 @@ export default function SystemMonitoring() {
       </div>
     </div>
     <ErrorBox error={status.error || monitor?.message} retry={refresh} />
+    {monitor?.history_only && <div className="notice" role="status">Đang xem lịch sử lưu trên database. Lần nhận dữ liệu cuối: {date(monitor.checked_at)}. Cần bật lại Windows/Monitoring để cập nhật trạng thái hiện tại.</div>}
+    {monitor?.archive_error && <div className="notice">Chưa lưu hoặc đọc được đầy đủ lịch sử trên database. Kiểm tra migration 007 và quyền truy cập database.</div>}
     {stale && <div className="notice">Chưa có dữ liệu giám sát mới. Trạng thái dưới đây có thể đã cũ; chưa thể xác nhận máy đang Active.</div>}
     <Panel title="1. Server Status" subtitle="Active được xác định từ instance trả về qua API Gateway; không suy đoán từ việc máy còn chạy." action={<Server size={20} />}>
       <div className="service-grid monitor-services">{components.map((c) => <div className="monitor-service" key={c.name}>
         <h4>{c.name}</h4><Badge status={stale ? "Unknown" : c.status || "Unknown"} />
-        <p>Database: {c.database || "Chưa xác định"}</p>
+        <p>Database: {stale ? "Chưa xác định" : c.database || "Chưa xác định"}</p>
         <p>Phản hồi: {c.latency_ms == null ? "—" : c.latency_ms + " ms"}</p>
         <small>Kiểm tra: {date(c.checked_at)}</small>
       </div>)}</div>
@@ -182,7 +184,7 @@ export default function SystemMonitoring() {
         {monitor.rpo_probe.last_sample_at && " Lần Primary xác nhận gần nhất " + date(monitor.rpo_probe.last_sample_at) + "."}
       </p>}
     </Panel>
-    <Panel title="4. Lịch sử các lần đo" subtitle="Mỗi sự cố có bản ghi riêng, lưu tại Monitoring và giữ qua các lần khởi động lại. Chọn Xem để đối chiếu số đo cũ." action={<Clock size={20} />}>
+    <Panel title="4. Lịch sử các lần đo" subtitle="Lịch sử được lưu trên database khi web nhận dữ liệu Monitoring; vẫn xem được khi Monitoring mất kết nối. Chọn Xem để đối chiếu số đo cũ." action={<Clock size={20} />}>
       {monitor?.persistence_error && <ErrorBox error="Nhật ký có lỗi đọc/ghi. Chưa thể bảo đảm dữ liệu đã được lưu đầy đủ." />}
       <div className="monitor-summary"><strong>Đã lưu {incidents.length} lần đo</strong></div>
       {incidents.length ? <>

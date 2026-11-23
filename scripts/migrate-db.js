@@ -22,6 +22,7 @@ try {
     "004_product_stock",
     "005_product_edit",
     "006_recovery_probes",
+    "007_monitoring_history",
   ];
   const pending = migrations.filter(
     (version) => !versions.some((row) => row.version === version),

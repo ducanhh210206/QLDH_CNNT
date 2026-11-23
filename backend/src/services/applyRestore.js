@@ -1,7 +1,7 @@
 import { digest } from '../utils/integrity.js';
 import { fail } from '../utils/errors.js';
 const ident = value => { if (!/^[A-Za-z0-9_]+$/.test(value)) throw Error('Invalid SQL identifier'); return '`'+value+'`'; };
-export const retainedTables = ['backup_records', 'restore_records', 'schema_migrations', 'recovery_probes'];
+export const retainedTables = ['backup_records', 'restore_records', 'schema_migrations', 'recovery_probes', 'monitoring_history'];
 
 // InnoDB full-index locking reads also lock insertion gaps. Competing writers
 // on either backend block until commit; a deadlock rolls the entire restore back.
